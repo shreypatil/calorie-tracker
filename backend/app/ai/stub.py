@@ -12,7 +12,11 @@ downstream stage is exercised exactly as it would be in production.
 
 import re
 
+# Imported by module path, not `from app.ai import ...`: this module is itself imported
+# while `app.ai` is still initializing, and the package attribute does not exist yet.
+from app.ai.stub_chat import converse as converse_stub
 from app.db.models import MealType
+from app.schemas.chat import AssistantTurn, ProviderMessage, ToolSpec
 from app.schemas.import_ import (
     ColumnMapping,
     DateFormat,
@@ -175,6 +179,10 @@ class StubProvider:
             )
 
         return entries
+
+    def converse(self, messages: list[ProviderMessage], tools: list[ToolSpec]) -> AssistantTurn:
+        """Regex intent matching — see `stub_chat` for the phrasings it understands."""
+        return converse_stub(messages, tools)
 
     @staticmethod
     def _guess_basis(headers: list[str]) -> NutritionBasis:

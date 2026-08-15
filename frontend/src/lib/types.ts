@@ -230,3 +230,48 @@ export interface ImportBatch {
   created_at: string;
   entries_remaining: number;
 }
+
+// --- Chat (FR-6) ----------------------------------------------------------
+
+export type ChatRole = "user" | "assistant" | "tool";
+export type ActionStatus = "pending" | "confirmed" | "discarded";
+
+/**
+ * A change the assistant proposed. Nothing is written until it is confirmed, so
+ * `arguments` is both the draft the user reviews and, once edited, exactly what
+ * gets executed.
+ */
+export interface PendingAction {
+  id: string;
+  tool: string;
+  summary: string;
+  arguments: Record<string, unknown>;
+  status: ActionStatus;
+  result: Record<string, unknown> | null;
+}
+
+/** One row of a draft `log_meal` action, as carried in its arguments. */
+export interface DraftMealItem {
+  food_name: string;
+  meal_type: MealType;
+  consumed_on?: string | null;
+  quantity: number;
+  unit: string;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: ChatRole;
+  content: string;
+  actions: PendingAction[];
+  tool_name: string | null;
+  created_at: string;
+}
+
+export interface ChatTurn {
+  messages: ChatMessage[];
+}

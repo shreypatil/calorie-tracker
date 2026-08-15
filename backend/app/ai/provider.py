@@ -9,10 +9,16 @@ calorie count it was never asked to produce.
 `extract_entries_from_text` is the exception, used only for prose diaries with
 no table to map. There the model does transcribe, so its output is checked
 against the source text before it is trusted (see `services/imports/prose.py`).
+
+`converse` is the chat primitive, and it follows the same principle from the
+other direction: the model does not act, it *asks* to act. It returns the name
+of a tool and some arguments, and `services/chat/` decides whether that tool
+exists, validates the arguments, supplies the user's identity, and runs it.
 """
 
 from typing import Protocol, runtime_checkable
 
+from app.schemas.chat import AssistantTurn, ProviderMessage, ToolSpec
 from app.schemas.import_ import RawEntry, TableMapping, TableSample
 
 
@@ -28,4 +34,8 @@ class AIProvider(Protocol):
 
     def extract_entries_from_text(self, chunk: str) -> list[RawEntry]:
         """Pull entries out of a prose diary that has no table to map."""
+        ...
+
+    def converse(self, messages: list[ProviderMessage], tools: list[ToolSpec]) -> AssistantTurn:
+        """Continue the conversation, optionally requesting tool calls."""
         ...

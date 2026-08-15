@@ -5,9 +5,9 @@ with AI-assisted entry from photos and PDFs, and a chat interface that can drive
 
 Full specification: [`requirements.md`](./requirements.md).
 
-> **Status: Phases 1–3a complete.** Auth, goals, entries, listing, the reporting layer, the web app
-> and PDF bulk import are built, tested, and runnable. Chat (3b) and photo extraction (3c) are not
-> yet built. See [Build status](#build-status).
+> **Status: Phases 1–3b complete.** Auth, goals, entries, listing, the reporting layer, the web app,
+> PDF bulk import and the conversational assistant are built, tested, and runnable. Photo
+> extraction (3c) is not yet built. See [Build status](#build-status).
 
 ---
 
@@ -97,6 +97,7 @@ backend/app/
   api/v1/routers/     HTTP layer only
   ai/                 provider Protocol, stub, and one OpenAI-compatible adapter
   services/imports/   PDF extraction, mapping application, preview, undo
+  services/chat/      tool registry, argument dispatch, the agent loop
   alembic/            migrations
 
 frontend/src/
@@ -155,6 +156,35 @@ Nothing is written until the user confirms. `POST /imports/pdf` returns draft ro
 summary of what was understood; committing goes through the same `POST /entries/bulk` that manual
 entry uses, tagged as one undoable import batch.
 
+**The assistant asks to act; it never acts.** The chat drives the whole app — logging meals, changing
+goals, answering questions about intake — through tool calling in a bounded loop. Three rules make
+that safe rather than alarming:
+
+*Tools are a registry, not an interpreter.* `services/chat/tools.py` maps ten names to ten thin
+delegations, each landing on the same service function the REST router calls. A name the registry
+does not contain never becomes a call, and arguments are validated by a Pydantic model before any
+service sees them.
+
+*Identity is never a tool argument.* No argument model has a user field — `user_id` is supplied by
+the dispatcher from the authenticated request. There is no slot for a model to fill and no prompt
+that can widen scope, however hostile the food names coming back from an earlier call. A test
+asserts this across the whole registry.
+
+*Writes are proposals.* A tool marked `writes` stops the loop instead of running. It is recorded as
+a draft, rendered as a nutrition panel, and executed only by an explicit confirm — which re-validates
+and accepts corrections, so a wrong estimate is edited rather than undone. That gate is what makes
+the rest honest: there is no food database, so "log two eggs" is answered with the model's own
+estimate, and a person sees every number before it becomes a row.
+
+```bash
+# Reads run inside the loop and answer directly; writes come back as a draft.
+curl -X POST localhost:8000/api/v1/chat/messages -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' -d '{"message":"how many calories did I eat yesterday?"}'
+```
+
+One tool, `nutrition_report`, wraps `aggregate()` directly — so every report shape the registry can
+express is available to the conversation without a single new query.
+
 ### Cross-cutting behaviour
 
 | Concern | How it works |
@@ -180,12 +210,17 @@ micronutrient summary is a table with meters rather than a chart — eleven hues
 would be worse than numbers.
 
 Screens: sign in / register · Today · Entries (filter, paginate, log a meal) · Reports · Goals ·
-Import (upload, review, commit, undo).
+Import (upload, review, commit, undo) · Assistant (chat, draft review, confirm or discard).
+
+The assistant deliberately does not look like a messaging app. Speaker identity is an uppercase
+micro-label over a rule, not a coloured bubble, and a proposed change renders as the same
+nutrition-panel block used everywhere else — because what it shows is a record about to be written,
+not a remark. There is no typing animation; the waiting state is a line of text.
 
 ## Testing
 
 ```bash
-make test    # 161 backend tests, plus the frontend type check and build
+make test    # 196 backend tests, plus the frontend type check and build
 make lint
 ```
 
@@ -204,6 +239,13 @@ layer. Regenerate them with `python -m tests.fixtures.make_fixtures`. Beyond the
 asserts the things that would be quiet bugs: that a preview writes nothing, that a fabricated number
 absent from the source is discarded rather than imported, that undo removes the *entries* and not just
 the batch row, and that one user cannot see or undo another's import.
+
+The assistant's tests are organised around the guarantee that is easiest to lose in a refactor: that
+proposing a write changes nothing. Alongside that, they check the action lifecycle (confirm once,
+never twice; discard commits nothing; an edited draft is re-validated into a `422` rather than a
+`500`), that no argument model anywhere in the registry accepts a user identifier, that a handler
+given user A's ID cannot touch user B's row even when handed its exact entry ID, and that a model
+inventing a tool name or looping forever ends in a readable answer rather than an error.
 
 Because these run against the stub provider they need no key and no network. That also means they
 prove the pipeline, not the quality of a real model's reading — see the caveat under
@@ -248,15 +290,25 @@ Moving to PostgreSQL is a `DATABASE_URL` change plus `make migrate`.
 | 1 | Scaffold, Docker, migrations, error/pagination/logging primitives, auth (FR-7), goals (FR-1), entries CRUD and filtered listing (FR-2, FR-3), seed, tests | **Complete** |
 | 2 | Composable aggregation layer, report endpoints, the web app and its four visualizations (FR-4) | **Complete** |
 | 3a | AI provider abstraction, PDF bulk import with preview and undo (FR-8) | **Complete** |
-| 3b | Conversational chat interface (FR-6) | Not started |
+| 3b | Conversational assistant with tool calling and confirmed writes (FR-6) | **Complete** |
 | 3c | AI photo extraction (FR-5) | Not started |
 | 4 | Docs, coverage, security review | Not started |
 
-**Verified against live Gemini.** Every fixture has been run end-to-end through the browser with a real
-free-tier key: the per-100g table had its basis, serving column and day-first dates all inferred
-correctly and scaled to 123/190/118/146 kcal; the prose diary yielded 6 entries with correct dates and
-meals; the scanned PDF was rejected with a clear message. The automated suite still runs entirely
-against the stub, so `make test` needs no key, no network, and no quota.
+**Verified against live Gemini.** Every import fixture has been run end-to-end through the browser
+with a real free-tier key: the per-100g table had its basis, serving column and day-first dates all
+inferred correctly and scaled to 123/190/118/146 kcal; the prose diary yielded 6 entries with correct
+dates and meals; the scanned PDF was rejected with a clear message.
+
+The assistant was checked the same way. "I had a bowl of porridge with blueberries and a flat white
+this morning" produced a two-row breakfast draft it had estimated at 250 and 160 kcal, saved nothing
+until confirmed; "how many calories did I eat yesterday?" called `daily_summary` and answered 1,585
+kcal, matching `GET /reports/daily-summary` exactly. That second case is the one that found a real
+bug — Gemini signs each tool call with a `thought_signature` and rejects the follow-up request if it
+is not echoed back, so multi-step conversations failed while single-step ones worked. The signature
+is now carried opaquely through `ToolCall.provider_extra`, with a regression test.
+
+The automated suite still runs entirely against the stub, so `make test` needs no key, no network,
+and no quota.
 
 Scanned PDFs are detected and rejected with a clear message rather than silently returning zero rows.
 `ExtractedDocument` carries `has_text_layer` and the page count so Phase 3c's vision model can pick
@@ -282,4 +334,8 @@ GET    /health                    GET    /api/v1/reports/daily-summary
 POST   /api/v1/imports/pdf        GET    /api/v1/reports/macros
 GET    /api/v1/imports            GET    /api/v1/reports/micros
 DELETE /api/v1/imports/{id}       GET    /api/v1/reports/goal-vs-actual
+
+GET    /api/v1/chat/messages      POST   /api/v1/chat/actions/{id}/confirm
+POST   /api/v1/chat/messages      POST   /api/v1/chat/actions/{id}/discard
+DELETE /api/v1/chat/messages
 ```

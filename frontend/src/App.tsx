@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { useAuth } from "./lib/auth";
+import { Chat } from "./pages/Chat";
 import { Dashboard } from "./pages/Dashboard";
 import { Entries } from "./pages/Entries";
 import { Goals } from "./pages/Goals";
@@ -64,6 +65,7 @@ export default function App() {
         <Route path="/reports" element={<Reports />} />
         <Route path="/goals" element={<Goals />} />
         <Route path="/import" element={<Import />} />
+        <Route path="/chat" element={<Chat />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

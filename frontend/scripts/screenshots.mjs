@@ -39,6 +39,7 @@ for (const [name, path] of [
   ["04-reports", "/reports"],
   ["05-goals", "/goals"],
   ["06-import", "/import"],
+  ["07-chat", "/chat"],
 ]) {
   await page.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
   await page.waitForTimeout(600);
@@ -50,6 +51,13 @@ await page.goto(`${BASE}/entries`, { waitUntil: "networkidle" });
 await page.click("text=Log a meal");
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${OUT}/06-log-form.png`, fullPage: true });
+
+// A chat turn that proposes a write, so the draft card is covered too.
+await page.goto(`${BASE}/chat`, { waitUntil: "networkidle" });
+await page.fill("#chat-message", "log 2 eggs and toast for breakfast");
+await page.click("button:has-text('Send')");
+await page.waitForSelector("text=Draft", { timeout: 15000 });
+await page.screenshot({ path: `${OUT}/08-chat-draft.png`, fullPage: true });
 
 console.log(errors.length ? `CONSOLE ERRORS:\n${errors.join("\n")}` : "No console errors.");
 await browser.close();

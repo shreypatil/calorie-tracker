@@ -11,6 +11,7 @@ const NAV = [
   { to: "/reports", label: "Reports" },
   { to: "/goals", label: "Goals" },
   { to: "/import", label: "Import" },
+  { to: "/chat", label: "Assistant" },
 ];
 
 export function Layout() {

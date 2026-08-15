@@ -27,6 +27,7 @@ from pydantic import BaseModel, ValidationError
 from app.core.config import Settings
 from app.core.errors import AppError, ExternalServiceError, UpstreamRateLimitError
 from app.core.logging import logger
+from app.schemas.chat import AssistantTurn, ProviderMessage, ToolCall, ToolSpec
 from app.schemas.import_ import (
     MAPPABLE_FIELDS,
     ProseExtraction,
@@ -116,6 +117,29 @@ class OpenAICompatibleProvider:
             schema=ProseExtraction,
         )
         return result.entries
+
+    def converse(self, messages: list[ProviderMessage], tools: list[ToolSpec]) -> AssistantTurn:
+        """One chat turn, with tools offered.
+
+        Temperature is low but not zero: this is prose for a person, and a deterministic
+        setting makes the assistant repeat itself verbatim across a conversation.
+        """
+        try:
+            completion = self._client.chat.completions.create(
+                model=self._model,
+                messages=[_to_wire(message) for message in messages],  # type: ignore[arg-type]
+                tools=[_tool_to_wire(tool) for tool in tools],  # type: ignore[arg-type]
+                tool_choice="auto",
+                temperature=0.2,
+            )
+        except Exception as exc:
+            raise self._wrap(exc) from exc
+
+        choice = completion.choices[0].message
+        return AssistantTurn(
+            content=choice.content or "",
+            tool_calls=[_call_from_wire(call) for call in (choice.tool_calls or [])],
+        )
 
     # -- transport --------------------------------------------------------
 
@@ -218,6 +242,73 @@ class OpenAICompatibleProvider:
 
 class _SchemaUnsupportedError(Exception):
     """The endpoint rejected a JSON-schema response format."""
+
+
+def _tool_to_wire(tool: ToolSpec) -> dict:
+    return {
+        "type": "function",
+        "function": {
+            "name": tool.name,
+            "description": tool.description,
+            "parameters": tool.parameters,
+        },
+    }
+
+
+def _to_wire(message: ProviderMessage) -> dict:
+    """Our provider-neutral message in OpenAI's shape."""
+    if message.role == "tool":
+        return {
+            "role": "tool",
+            "tool_call_id": message.tool_call_id,
+            "content": message.content,
+        }
+
+    payload: dict = {"role": message.role, "content": message.content}
+    if message.tool_calls:
+        payload["tool_calls"] = [_call_to_wire(call) for call in message.tool_calls]
+    return payload
+
+
+def _call_to_wire(call: ToolCall) -> dict:
+    """Replay one tool call, including whatever the provider attached to it.
+
+    Echoing `extra_content` back is not optional on Gemini: its thinking models sign each
+    function call with a `thought_signature`, and a follow-up request that omits it is
+    rejected outright with a 400. The field is opaque to us and simply travels back out.
+    """
+    wire: dict = {
+        "id": call.id,
+        "type": "function",
+        "function": {"name": call.name, "arguments": json.dumps(call.arguments)},
+    }
+    if call.provider_extra:
+        wire["extra_content"] = call.provider_extra
+    return wire
+
+
+def _call_from_wire(call) -> ToolCall:
+    """Read one tool call back.
+
+    Malformed arguments become an empty dict rather than an exception: the tool's own
+    argument model will reject them, and its error message tells the model what to fix —
+    which is a far better outcome than failing the whole turn.
+    """
+    try:
+        arguments = json.loads(call.function.arguments or "{}")
+    except (json.JSONDecodeError, TypeError):
+        logger.warning("ai_tool_arguments_unparsable", extra={"tool": call.function.name})
+        arguments = {}
+    if not isinstance(arguments, dict):
+        arguments = {}
+
+    extra = (getattr(call, "model_extra", None) or {}).get("extra_content")
+    return ToolCall(
+        id=call.id,
+        name=call.function.name,
+        arguments=arguments,
+        provider_extra=extra if isinstance(extra, dict) else None,
+    )
 
 
 def _is_quota_error(exc: Exception) -> bool:

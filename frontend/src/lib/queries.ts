@@ -3,6 +3,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, query } from "./api";
 import type {
+  ChatMessage,
+  ChatTurn,
   DailySummary,
   ImportBatch,
   PdfImportPreview,
@@ -218,5 +220,76 @@ export function useUndoImport() {
       invalidate();
       queryClient.invalidateQueries({ queryKey: ["imports"] });
     },
+  });
+}
+
+// --- Chat (FR-6) ----------------------------------------------------------
+
+/**
+ * The transcript. The API pages newest-first like every other list endpoint;
+ * a conversation reads the other way, so it is reversed here rather than in the
+ * component.
+ */
+export function useChatMessages() {
+  return useQuery({
+    queryKey: ["chat"],
+    queryFn: async () => {
+      const page = await api.get<Page<ChatMessage>>(`/chat/messages${query({ page_size: 100 })}`);
+      return [...page.items].reverse();
+    },
+  });
+}
+
+export function useSendMessage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (message: string) => api.post<ChatTurn>("/chat/messages", { message }),
+    // The turn is appended to the cache by the caller; this keeps the canonical
+    // copy in step for the next mount.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["chat"] }),
+  });
+}
+
+/**
+ * Confirming is the only way chat changes data, so it is the only chat mutation
+ * that has to invalidate the rest of the app. Goals and weights are included
+ * because `set_goal` and `log_weight` are confirmable too.
+ */
+function useInvalidateAfterChatWrite() {
+  const invalidateEntries = useInvalidateOnEntryChange();
+  const queryClient = useQueryClient();
+  return () => {
+    invalidateEntries();
+    for (const key of ["goals", "weights", "chat"]) {
+      queryClient.invalidateQueries({ queryKey: [key] });
+    }
+  };
+}
+
+export function useConfirmAction() {
+  const invalidate = useInvalidateAfterChatWrite();
+  return useMutation({
+    mutationFn: ({ id, args }: { id: string; args?: Record<string, unknown> }) =>
+      api.post<ChatMessage>(
+        `/chat/actions/${id}/confirm`,
+        args ? { arguments: args } : {},
+      ),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDiscardAction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post<ChatMessage>(`/chat/actions/${id}/discard`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["chat"] }),
+  });
+}
+
+export function useClearChat() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.delete<void>("/chat/messages"),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["chat"] }),
   });
 }
