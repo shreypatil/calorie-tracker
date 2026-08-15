@@ -16,10 +16,14 @@ of a tool and some arguments, and `services/chat/` decides whether that tool
 exists, validates the arguments, supplies the user's identity, and runs it.
 """
 
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from app.schemas.chat import AssistantTurn, ProviderMessage, ToolSpec
 from app.schemas.import_ import RawEntry, TableMapping, TableSample
+from app.schemas.photo import PhotoExtraction, PhotoKind
+
+if TYPE_CHECKING:  # avoids a cycle: the photo service imports this module
+    from app.services.photo.prepare import PreparedImage
 
 
 @runtime_checkable
@@ -38,4 +42,12 @@ class AIProvider(Protocol):
 
     def converse(self, messages: list[ProviderMessage], tools: list[ToolSpec]) -> AssistantTurn:
         """Continue the conversation, optionally requesting tool calls."""
+        ...
+
+    def analyze_image(self, image: "PreparedImage", kind: PhotoKind) -> PhotoExtraction:
+        """Read a nutrition label, or estimate the contents of a plate of food.
+
+        For a label the result must include the panel transcribed verbatim: the caller checks
+        every reported figure against it and discards any that was not actually written there.
+        """
         ...

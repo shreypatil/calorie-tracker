@@ -6,14 +6,21 @@
  */
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { ScanControl } from "../components/photo/ScanControl";
 import { Alert, Button, Card, CardHeader, Field, Input, Select } from "../components/ui";
 import { useCreateEntry } from "../lib/queries";
 import { ApiError } from "../lib/api";
 import { MEAL_LABELS, nutrientLabel, nutrientUnit, today } from "../lib/format";
-import { MEAL_TYPES, MICRONUTRIENTS, type Micronutrient } from "../lib/types";
+import {
+  MEAL_TYPES,
+  MICRONUTRIENTS,
+  type DraftRow,
+  type MealType,
+  type Micronutrient,
+} from "../lib/types";
 
 const optionalAmount = z
   .union([z.literal(""), z.coerce.number().min(0, "Cannot be negative")])
@@ -59,15 +66,54 @@ export function LogEntryForm({ onLogged }: { onLogged?: () => void }) {
   const [showMicros, setShowMicros] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
+  const [scanNote, setScanNote] = useState<string | null>(null);
+
   const {
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: DEFAULTS,
   });
+
+  // The scan is filed against whatever date and meal the form currently shows, so a photo
+  // taken for yesterday's lunch does not silently land on today's breakfast.
+  const consumedOn = useWatch({ control, name: "consumed_on" }) as string;
+  const mealType = useWatch({ control, name: "meal_type" }) as MealType;
+
+  /** One food read from a photo: fill the form rather than making the user retype it. */
+  function applyScannedRow(row: DraftRow) {
+    const entry = row.entry;
+    if (!entry) return;
+
+    reset({
+      ...DEFAULTS,
+      consumed_on: entry.consumed_on,
+      meal_type: entry.meal_type,
+      food_name: entry.food_name,
+      quantity: entry.quantity,
+      unit: entry.unit,
+      calories: entry.calories,
+      protein_g: entry.protein_g,
+      carbs_g: entry.carbs_g,
+      fat_g: entry.fat_g,
+      ...Object.fromEntries(
+        MICRONUTRIENTS.map((name) => [name, entry[name] ?? ""]).filter(([, value]) => value !== ""),
+      ),
+    } as unknown as FormValues);
+
+    // Anything the reading could not stand behind is said out loud — a blank field with no
+    // explanation would look like the label simply did not list it.
+    setScanNote(
+      row.issues.length > 0
+        ? row.issues.map((issue) => issue.message).join(" ")
+        : "Filled in from the photo — check it before saving.",
+    );
+    setShowMicros(MICRONUTRIENTS.some((name) => entry[name] != null));
+  }
 
   async function onSubmit(values: FormValues) {
     setServerError(null);
@@ -81,6 +127,7 @@ export function LogEntryForm({ onLogged }: { onLogged?: () => void }) {
       await create.mutateAsync(body);
       reset({ ...DEFAULTS, consumed_on: values.consumed_on, meal_type: values.meal_type });
       setShowMicros(false);
+      setScanNote(null);
       onLogged?.();
     } catch (error) {
       setServerError(
@@ -97,10 +144,23 @@ export function LogEntryForm({ onLogged }: { onLogged?: () => void }) {
     <Card>
       <CardHeader title="Log a meal" subtitle="Nutrition values are per the quantity you enter." />
 
+      <ScanControl
+        mealType={mealType}
+        consumedOn={consumedOn}
+        onSingleResult={applyScannedRow}
+        onCommitted={() => onLogged?.()}
+      />
+
       <form onSubmit={handleSubmit(onSubmit)} className="p-5">
         {serverError && (
           <div className="mb-4">
             <Alert>{serverError}</Alert>
+          </div>
+        )}
+
+        {scanNote && (
+          <div className="mb-4">
+            <Alert tone="info">{scanNote}</Alert>
           </div>
         )}
 

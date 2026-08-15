@@ -27,6 +27,7 @@ from app.services.imports.parsing import (
     parse_number,
     parse_text,
 )
+from app.services.nutrition import scale_per_100g
 
 #: Below this, a column mapping is a guess and its rows deserve a human look.
 LOW_CONFIDENCE = 0.6
@@ -128,15 +129,9 @@ def _apply_basis(
         )
         return
 
-    factor = grams / 100
-    for field in NUMERIC_FIELDS:
-        if field in values and isinstance(values[field], int | float):
-            values[field] = round(values[field] * factor, 3)
-
-    # The quantity is the weight eaten, and the figures now describe that whole
+    # The quantity is the weight eaten, and the figures then describe that whole
     # serving — so the entry is one serving of it, not `grams` servings.
-    values["quantity"] = 1.0
-    values.setdefault("unit", f"{grams:g} g")
+    scale_per_100g(values, grams, NUMERIC_FIELDS)
 
 
 def _apply_defaults(values: dict, mapping: TableMapping, issues: list[RowIssue]) -> None:

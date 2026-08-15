@@ -34,6 +34,7 @@ including the AI ones without supplying any API keys.
 | Reports | One composable aggregation layer | Reports are expected to grow well past the required set, so a new report must mean a new caller, not new SQL. See FR-4 and §5.3. |
 | Uploads | Processed in memory, never stored | The extracted values are the only durable output; the user confirms them before anything is written. No job table, no queue, no stored bytes. |
 | Chat | One conversation per user | Chat is a control surface for the app, not a messaging product. Multi-session history would be unused complexity. |
+| Photo reading | One vision call, no local OCR engine | A photograph has no text layer, so whatever reads its digits is an OCR model — the choice is which one, not whether. A local engine would add a system dependency, do poorly on real phone photos of curved packaging, and still not cover meal estimation. The project's "don't trust transcription" rule is kept by verifying instead: the model returns the panel verbatim and every figure it reports is checked against that text. |
 | Chat actions | Tool calling through a server-side registry | The model names a tool and supplies arguments; it never reaches the database. Names resolve through a registry and arguments are validated against a schema before any service runs, so the surface the model can reach is exactly what was deliberately exposed. |
 | Chat writes | Proposed, then confirmed | Reads answer directly, but anything that changes data is returned as a draft and applied only on an explicit confirm. With no food database, logged nutrition figures are the model's estimate — acceptable only because a person reviews and can correct every number before it is written. |
 | Sequencing | Phased: core → reports → AI | Each phase ends runnable and demoable. |
@@ -109,6 +110,11 @@ pre-fills the entry form.
 - Uploads are validated for content type and size before processing.
 - With no API key configured, the stub provider returns deterministic draft data so the flow is fully exercisable.
 - A provider failure surfaces a clear, actionable error rather than a stack trace or a silently empty form.
+- The user states whether the photo is a **label** or a **meal**, so each is prompted for and trusted differently.
+- **A label figure that does not appear in the model's own verbatim transcript of the panel is discarded and flagged**,
+  never silently kept. Stated calories inconsistent with the macros (4/4/9) are flagged for a second look.
+- A meal photo yields one draft row per food, each independently editable, and is labelled as an estimate throughout.
+- Photo-derived rows are never marked ready; a person reviews every one before it is saved.
 
 ### FR-6 — Conversational chat interface
 
@@ -265,7 +271,7 @@ All endpoints live under `/api/v1`. All list endpoints are paginated per NFR-3.
 | Entries | `POST /entries` · `GET /entries` (`date_from`, `date_to`, `meal_type`, `q`) · `GET/PATCH/DELETE /entries/{id}` · `POST /entries/bulk` |
 | Weights | `GET /weights` · `POST /weights` |
 | Reports | `GET /reports/aggregate` · `GET /reports/daily-summary` · `GET /reports/trend` · `GET /reports/macros` · `GET /reports/micros` · `GET /reports/goal-vs-actual` |
-| AI | `POST /ai/analyze-image` → draft entry, nothing persisted |
+| AI | `POST /ai/analyze-image` (`kind=label\|meal`, `meal_type`, `consumed_on`) → draft rows, nothing persisted; commit via `POST /entries` or `POST /entries/bulk` |
 | Imports | `POST /imports/pdf` → draft rows, nothing persisted; commit via `POST /entries/bulk` |
 | Chat | `GET /chat/messages` · `POST /chat/messages` → reply plus any proposed actions, nothing persisted beyond the transcript · `POST /chat/actions/{id}/confirm` · `POST /chat/actions/{id}/discard` · `DELETE /chat/messages` |
 
@@ -281,6 +287,7 @@ All endpoints live under `/api/v1`. All list endpoints are paginated per NFR-3.
 - External food database lookup — deferred behind the `FoodLookupSource` interface
 - Multi-session chat history
 - Stored uploads and async/queued job processing
+- HEIC photo decoding — detected and refused with instructions rather than adding a decoder dependency
 
 ### 7.1 Known limitation
 
@@ -300,6 +307,7 @@ SQL is one date-bucketing helper, and migrating to PostgreSQL is a connection-st
 | **Micro** | Micronutrient: a vitamin or mineral, plus fiber, sugar, and cholesterol as tracked here. |
 | **Goal version** | A row in `goals` with an `effective_from` date. The version in force on a date is the latest one at or before it. |
 | **Draft entry / draft rows** | Nutritional data extracted from a photo or PDF, returned to the client for review. Not persisted until the user confirms. |
+| **Transcript** | The nutrition panel copied verbatim out of a photographed label. Used only to verify the structured figures against; never shown as data itself. |
 | **Proposed action** | A change the chat assistant has asked to make, held against the message that proposed it. It carries the validated arguments it would run with, and does nothing until confirmed or discarded. |
 | **Tool** | One named, schema-validated operation the chat assistant may request. Each is a thin delegation to the same service function the REST API uses. |
 | **Import batch** | A record of one confirmed PDF import, linking the entries it created so the import can be undone. |

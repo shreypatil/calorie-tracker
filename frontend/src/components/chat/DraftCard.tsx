@@ -13,9 +13,10 @@
 
 import { useState } from "react";
 
-import { formatNumber, MEAL_LABELS } from "../../lib/format";
+import { formatNumber } from "../../lib/format";
 import type { DraftMealItem, PendingAction } from "../../lib/types";
-import { Button, Input, Value } from "../ui";
+import { MealDraftTable } from "../MealDraftTable";
+import { Button, Value } from "../ui";
 import { cx } from "../../lib/cx";
 
 function isMealDraft(action: PendingAction): boolean {
@@ -31,84 +32,6 @@ const HIDDEN_KEYS = new Set(["entry_id"]);
 
 function readableKey(key: string): string {
   return key.replace(/_/g, " ").replace(/\bg\b/, "(g)").replace(/\bkg\b/, "(kg)");
-}
-
-function MealTable({
-  items,
-  editable,
-  onChange,
-}: {
-  items: DraftMealItem[];
-  editable: boolean;
-  onChange: (index: number, patch: Partial<DraftMealItem>) => void;
-}) {
-  const total = items.reduce((sum, item) => sum + (Number(item.calories) || 0), 0);
-
-  return (
-    <table className="w-full text-[13px]">
-      <thead>
-        <tr className="border-b border-rule">
-          <th className="eyebrow pb-1.5 text-left font-normal">Food</th>
-          <th className="eyebrow pb-1.5 text-left font-normal">Meal</th>
-          <th className="eyebrow pb-1.5 text-right font-normal">Qty</th>
-          <th className="eyebrow pb-1.5 text-right font-normal">Calories</th>
-        </tr>
-      </thead>
-      <tbody>
-        {items.map((item, index) => (
-          <tr key={index} className="border-b border-rule-soft last:border-0">
-            <td className="py-1.5 pr-3">
-              {editable ? (
-                <Input
-                  aria-label={`Food name for row ${index + 1}`}
-                  value={item.food_name}
-                  onChange={(event) => onChange(index, { food_name: event.target.value })}
-                />
-              ) : (
-                item.food_name
-              )}
-            </td>
-            <td className="py-1.5 pr-3 text-ink-muted">
-              {MEAL_LABELS[item.meal_type] ?? item.meal_type}
-            </td>
-            <td className="py-1.5 pr-3 text-right">
-              <Value>
-                {formatNumber(item.quantity, item.quantity % 1 ? 1 : 0)}
-              </Value>
-              <span className="ml-1 text-[12px] text-ink-muted">{item.unit}</span>
-            </td>
-            <td className="w-28 py-1.5 text-right">
-              {editable ? (
-                <Input
-                  aria-label={`Calories for row ${index + 1}`}
-                  type="number"
-                  min={0}
-                  className="text-right"
-                  value={item.calories}
-                  onChange={(event) =>
-                    onChange(index, { calories: Number(event.target.value) })
-                  }
-                />
-              ) : (
-                <Value>{formatNumber(item.calories)}</Value>
-              )}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-      <tfoot>
-        <tr className="border-t-2 border-ink">
-          <td className="eyebrow pt-2" colSpan={3}>
-            Total
-          </td>
-          <td className="pt-2 text-right">
-            <Value className="font-semibold">{formatNumber(total)}</Value>
-            <span className="ml-1 text-[12px] text-ink-muted">kcal</span>
-          </td>
-        </tr>
-      </tfoot>
-    </table>
-  );
 }
 
 function ArgumentList({ action }: { action: PendingAction }) {
@@ -184,7 +107,7 @@ export function DraftCard({
       </div>
 
       {meal ? (
-        <MealTable items={items} editable={pending} onChange={update} />
+        <MealDraftTable rows={items} editable={pending} onChange={update} />
       ) : (
         <ArgumentList action={action} />
       )}

@@ -5,9 +5,9 @@ with AI-assisted entry from photos and PDFs, and a chat interface that can drive
 
 Full specification: [`requirements.md`](./requirements.md).
 
-> **Status: Phases 1–3b complete.** Auth, goals, entries, listing, the reporting layer, the web app,
-> PDF bulk import and the conversational assistant are built, tested, and runnable. Photo
-> extraction (3c) is not yet built. See [Build status](#build-status).
+> **Status: every functional requirement is built.** Auth, goals, entries, listing, the reporting
+> layer, the web app, PDF bulk import, the conversational assistant and photo extraction are all
+> implemented, tested, and runnable with no API key. See [Build status](#build-status).
 
 ---
 
@@ -98,6 +98,7 @@ backend/app/
   ai/                 provider Protocol, stub, and one OpenAI-compatible adapter
   services/imports/   PDF extraction, mapping application, preview, undo
   services/chat/      tool registry, argument dispatch, the agent loop
+  services/photo/     image normalisation, vision extraction, verification
   alembic/            migrations
 
 frontend/src/
@@ -187,6 +188,30 @@ curl -X POST localhost:8000/api/v1/chat/messages -H "Authorization: Bearer $TOKE
 One tool, `nutrition_report`, wraps `aggregate()` directly — so every report shape the registry can
 express is available to the conversation without a single new query.
 
+**A photograph has no text layer, so the model is checked rather than trusted.** The obvious question
+for label scanning is whether to run our own OCR. The answer is no, and the reason is precise: the
+PDF pipeline could hold the model at arm's length because `pdfplumber` extracted real characters from
+the file. Nothing extracts characters from a photo — whatever reads the digits *is* an OCR model. A
+local engine like Tesseract would add a system dependency, do poorly on the phone photos people
+actually take of curved, glossy packaging, and still not touch the second half of the feature, since
+estimating a plate of food needs a vision model regardless.
+
+So the model transcribes, and `services/photo/verify.py` checks its work two ways. It returns the
+panel **verbatim** alongside the structured values, and every figure it reports must literally appear
+in that transcript — one that does not is dropped and the field flagged, because a plausible invented
+calorie count is indistinguishable from a correct one by eye. Then the arithmetic is tested: calories
+should equal 4·protein + 4·carbs + 9·fat, and a misread digit usually stops that closing. That one
+flags rather than drops, since fibre and sugar alcohols make honest deviation possible.
+
+Neither check can validate a plate of food, because there is no ground truth to check against. That
+case is handled by not pretending otherwise — the rows say they are estimates, every figure stays
+editable, and nothing is written until confirmed.
+
+The image itself is normalised in memory and discarded: EXIF orientation applied first (a phone
+stores a portrait shot sideways, and a sideways label reads badly), a decompression-bomb cap, a
+downscale to 1568px that cuts cost and latency, and a re-encode that drops the GPS tags a phone
+attaches. No bytes reach disk or the database at any point.
+
 ### Cross-cutting behaviour
 
 | Concern | How it works |
@@ -211,8 +236,15 @@ one series carries a text legend, so identity never rests on colour alone. The e
 micronutrient summary is a table with meters rather than a chart — eleven hues nobody can tell apart
 would be worse than numbers.
 
-Screens: sign in / register · Today · Entries (filter, paginate, log a meal) · Reports · Goals ·
-Import (upload, review, commit, undo) · Assistant (chat, draft review, confirm or discard).
+Screens: sign in / register · Today · Entries (filter, paginate, log a meal, scan a photo) ·
+Reports · Goals · Import (upload, review, commit, undo) · Assistant (chat, draft review, confirm
+or discard).
+
+Photo capture sits on the log-a-meal form as two buttons rather than one, because the two jobs are
+different and saying so is more honest than hiding it: *Scan a label* is transcription that gets
+checked, *Estimate a meal* is judgement that cannot be. A single food fills the form; a plate
+becomes an itemised draft, since averaging three foods into one row discards exactly the detail that
+makes the macros worth logging.
 
 The assistant deliberately does not look like a messaging app. Speaker identity is an uppercase
 micro-label over a rule, not a coloured bubble, and a proposed change renders as the same
@@ -222,7 +254,7 @@ not a remark. There is no typing animation; the waiting state is a line of text.
 ## Testing
 
 ```bash
-make test    # 196 backend tests, plus the frontend type check and build
+make test    # 224 backend tests, plus the frontend type check and build
 make lint
 ```
 
@@ -248,6 +280,15 @@ never twice; discard commits nothing; an edited draft is re-validated into a `42
 `500`), that no argument model anywhere in the registry accepts a user identifier, that a handler
 given user A's ID cannot touch user B's row even when handed its exact entry ID, and that a model
 inventing a tool name or looping forever ends in a readable answer rather than an error.
+
+Photo extraction is tested on generated image fixtures, each standing for a failure mode: a label, a
+label stored sideways with an EXIF rotation tag, a plate, and a 9000×9000 PNG that is small on disk
+and enormous in memory. The load-bearing test hands the pipeline a provider that reports a figure
+absent from its own transcript and asserts it is dropped and flagged — that check is the entire
+argument for trusting a label scan without a second OCR engine. Alongside it: partial macros do not
+trip the arithmetic check, per-100g values scale to a stated serving and are left alone without one,
+EXIF rotation is applied, oversized images are refused, metadata does not survive, and analysing
+persists nothing.
 
 Because these run against the stub provider they need no key and no network. That also means they
 prove the pipeline, not the quality of a real model's reading — see the caveat under
@@ -293,7 +334,7 @@ Moving to PostgreSQL is a `DATABASE_URL` change plus `make migrate`.
 | 2 | Composable aggregation layer, report endpoints, the web app and its four visualizations (FR-4) | **Complete** |
 | 3a | AI provider abstraction, PDF bulk import with preview and undo (FR-8) | **Complete** |
 | 3b | Conversational assistant with tool calling and confirmed writes (FR-6) | **Complete** |
-| 3c | AI photo extraction (FR-5) | Not started |
+| 3c | Photo extraction: nutrition labels and meal estimation (FR-5) | **Complete** |
 | 4 | Docs, coverage, security review | Not started |
 
 **Verified against live Gemini.** Every import fixture has been run end-to-end through the browser
@@ -308,6 +349,18 @@ kcal, matching `GET /reports/daily-summary` exactly. That second case is the one
 bug — Gemini signs each tool call with a `thought_signature` and rejects the follow-up request if it
 is not echoed back, so multi-step conversations failed while single-step ones worked. The signature
 is now carried opaquely through `ToolCall.provider_extra`, with a regression test.
+
+Photo extraction was checked the same way. A rendered per-100g oats label came back with the basis,
+the 40 g serving size and every figure read correctly, all of them surviving the transcript check and
+scaling to 151.6 kcal. The meal path was the more interesting result: given a synthetic drawing of a
+plate, the model returned confidence 0.2, generic names, and a note saying the image looked like a
+graphic rather than real food — which is exactly the behaviour that makes the low-confidence warning
+worth showing.
+
+That work also exposed a second provider quirk. Gemini rejects certain Pydantic-generated schemas
+with a bare `INVALID_ARGUMENT` that names nothing, and it does so for some schemas and not others.
+The adapter's JSON-mode fallback handles those cases correctly once it recognises them, so the fix
+was to treat that message as a schema problem rather than a fatal one.
 
 The automated suite still runs entirely against the stub, so `make test` needs no key, no network,
 and no quota.
@@ -333,9 +386,10 @@ DELETE /api/v1/goals/{id}         GET    /api/v1/reports/aggregate
                                   GET    /api/v1/reports/catalogue
 GET    /health                    GET    /api/v1/reports/daily-summary
                                   GET    /api/v1/reports/trend
-POST   /api/v1/imports/pdf        GET    /api/v1/reports/macros
-GET    /api/v1/imports            GET    /api/v1/reports/micros
-DELETE /api/v1/imports/{id}       GET    /api/v1/reports/goal-vs-actual
+POST   /api/v1/ai/analyze-image   GET    /api/v1/reports/macros
+POST   /api/v1/imports/pdf        GET    /api/v1/reports/micros
+GET    /api/v1/imports            GET    /api/v1/reports/goal-vs-actual
+DELETE /api/v1/imports/{id}
 
 GET    /api/v1/chat/messages      POST   /api/v1/chat/actions/{id}/confirm
 POST   /api/v1/chat/messages      POST   /api/v1/chat/actions/{id}/discard

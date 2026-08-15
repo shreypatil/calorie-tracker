@@ -25,6 +25,7 @@ from app.schemas.import_ import (
     TableMapping,
     TableSample,
 )
+from app.schemas.photo import PhotoExtraction, PhotoKind, RawFoodItem
 
 #: Header keywords → entry field, most specific first. Order matters: "sugar"
 #: must be tested before "sug"-free generic matches, and "carb" before "cal"
@@ -183,6 +184,83 @@ class StubProvider:
     def converse(self, messages: list[ProviderMessage], tools: list[ToolSpec]) -> AssistantTurn:
         """Regex intent matching — see `stub_chat` for the phrasings it understands."""
         return converse_stub(messages, tools)
+
+    def analyze_image(self, image, kind: PhotoKind) -> PhotoExtraction:
+        """A fixed draft — the stub cannot see, so it stands in for what a model would say.
+
+        The label transcript deliberately contains every figure the label item reports, so the
+        caller's verification step runs for real rather than being trivially skipped. Change
+        one without the other and `test_photo.py` will notice.
+        """
+        if kind is PhotoKind.LABEL:
+            return PhotoExtraction(
+                kind=PhotoKind.LABEL,
+                transcript=(
+                    "ROLLED OATS\n"
+                    "Nutrition Information\n"
+                    "Servings per pack: 10   Serving size: 40 g\n"
+                    "Per 100 g\n"
+                    "Energy 379 kcal\n"
+                    "Protein 13.2 g\n"
+                    "Carbohydrate 67.7 g\n"
+                    "Fat 6.5 g\n"
+                    "Fibre 10.1 g\n"
+                    "Sugars 1.1 g\n"
+                    "Sodium 6 mg\n"
+                ),
+                basis=NutritionBasis.PER_100G,
+                serving_size_g=40,
+                items=[
+                    RawFoodItem(
+                        food_name="Rolled Oats",
+                        calories=379,
+                        protein_g=13.2,
+                        carbs_g=67.7,
+                        fat_g=6.5,
+                        fiber_g=10.1,
+                        sugar_g=1.1,
+                        sodium_mg=6,
+                    )
+                ],
+                notes="Read from the per-100 g column.",
+                confidence=0.9,
+            )
+
+        return PhotoExtraction(
+            kind=PhotoKind.MEAL,
+            basis=NutritionBasis.PER_SERVING,
+            items=[
+                RawFoodItem(
+                    food_name="Grilled chicken breast",
+                    quantity=150,
+                    unit="g",
+                    calories=248,
+                    protein_g=46.5,
+                    carbs_g=0,
+                    fat_g=5.4,
+                ),
+                RawFoodItem(
+                    food_name="White rice",
+                    quantity=200,
+                    unit="g",
+                    calories=260,
+                    protein_g=5.4,
+                    carbs_g=56.2,
+                    fat_g=0.6,
+                ),
+                RawFoodItem(
+                    food_name="Green salad",
+                    quantity=80,
+                    unit="g",
+                    calories=33,
+                    protein_g=1.6,
+                    carbs_g=5.8,
+                    fat_g=0.6,
+                ),
+            ],
+            notes="Portion sizes estimated from the plate.",
+            confidence=0.6,
+        )
 
     @staticmethod
     def _guess_basis(headers: list[str]) -> NutritionBasis:

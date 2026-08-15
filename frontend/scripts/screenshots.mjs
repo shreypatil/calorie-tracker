@@ -52,6 +52,30 @@ await page.click("text=Log a meal");
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${OUT}/06-log-form.png`, fullPage: true });
 
+// Photo extraction: a label fills the form, a plate produces an itemised draft.
+const FIXTURES = "../backend/tests/fixtures";
+
+/** Drive the real button, so the label/meal mode is set the way a user sets it. */
+async function scan(label, file) {
+  const chooser = page.waitForEvent("filechooser");
+  await page.click(`button:has-text("${label}")`);
+  await (await chooser).setFiles(file);
+}
+
+await page.goto(`${BASE}/entries`, { waitUntil: "networkidle" });
+await page.click("text=Log a meal");
+
+await scan("Scan a label", `${FIXTURES}/label.jpg`);
+await page.waitForFunction(
+  () => document.querySelector('input[name="food_name"]')?.value?.length > 0,
+  { timeout: 20000 },
+);
+await page.screenshot({ path: `${OUT}/09-photo-label.png`, fullPage: true });
+
+await scan("Estimate a meal", `${FIXTURES}/plate.jpg`);
+await page.waitForSelector("text=Add all", { timeout: 20000 });
+await page.screenshot({ path: `${OUT}/10-photo-plate.png`, fullPage: true });
+
 // A chat turn that proposes a write, so the draft card is covered too.
 await page.goto(`${BASE}/chat`, { waitUntil: "networkidle" });
 await page.fill("#chat-message", "log 2 eggs and toast for breakfast");

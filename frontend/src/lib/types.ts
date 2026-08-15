@@ -275,3 +275,21 @@ export interface ChatMessage {
 export interface ChatTurn {
   messages: ChatMessage[];
 }
+
+// --- Photo extraction (FR-5) ---------------------------------------------
+
+export type PhotoKind = "label" | "meal";
+
+/**
+ * The result of reading one photo. Nothing here has been saved — rows are
+ * always `needs_review`, whether transcribed from a label or estimated.
+ */
+export interface PhotoDraft {
+  kind: PhotoKind;
+  source_filename: string;
+  basis: NutritionBasis;
+  serving_size_g: number | null;
+  confidence: number;
+  notes: string;
+  rows: DraftRow[];
+}

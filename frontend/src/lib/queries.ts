@@ -17,6 +17,8 @@ import type {
   MealType,
   MicroSummary,
   Page,
+  PhotoDraft,
+  PhotoKind,
   TrendResponse,
   WeightLog,
 } from "./types";
@@ -291,5 +293,31 @@ export function useClearChat() {
   return useMutation({
     mutationFn: () => api.delete<void>("/chat/messages"),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["chat"] }),
+  });
+}
+
+// --- Photo extraction (FR-5) ----------------------------------------------
+
+export interface AnalyzeRequest {
+  file: File;
+  kind: PhotoKind;
+  meal_type: MealType;
+  consumed_on: string;
+}
+
+/** Read a photo into draft rows. Nothing is saved by this call. */
+export function useAnalyzeImage() {
+  return useMutation({
+    mutationFn: ({ file, ...params }: AnalyzeRequest) =>
+      api.upload<PhotoDraft>(`/ai/analyze-image${query({ ...params })}`, file),
+  });
+}
+
+/** Commit reviewed photo rows through the same bulk endpoint import and chat use. */
+export function useCommitPhotoRows() {
+  const invalidate = useInvalidateOnEntryChange();
+  return useMutation({
+    mutationFn: (entries: unknown[]) => api.post<FoodEntry[]>("/entries/bulk", { entries }),
+    onSuccess: invalidate,
   });
 }

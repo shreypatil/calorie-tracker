@@ -10,14 +10,13 @@ calorie count that was never written down. Rows from this path are never better
 than `needs_review`, so a person sees them all regardless.
 """
 
-import re
-
 from app.ai.provider import AIProvider
 from app.core.logging import logger
 from app.db.models import EntrySource
 from app.schemas.entry import EntryCreate
 from app.schemas.import_ import DraftRow, RawEntry, RowIssue, RowStatus, TableMapping
 from app.services.imports.parsing import parse_date, parse_meal_type, parse_text
+from app.services.nutrition import appears_in_source
 
 #: Lines per request. Small enough to keep each call cheap and bounded, large
 #: enough that a day's entries usually stay together with their date heading.
@@ -33,18 +32,6 @@ def _chunk(text: str) -> list[str]:
     ] or [text]
 
 
-def _appears_in_source(value: float, source: str) -> bool:
-    """Is this number actually written in the text?
-
-    Matches the digits as they would be typed — `320`, `320.0` and `1,234` all
-    count — with a word boundary so 32 does not match inside 320.
-    """
-    candidates = {f"{value:g}", f"{value:.0f}", f"{value:.1f}"}
-    if value >= 1000:
-        candidates.add(f"{value:,.0f}")
-    return any(re.search(rf"(?<![\d.]){re.escape(text)}(?![\d.])", source) for text in candidates)
-
-
 def _to_draft(index: int, raw: RawEntry, source: str, mapping: TableMapping) -> DraftRow:
     issues: list[RowIssue] = [
         RowIssue(message="Read from prose rather than a table — please check it.")
@@ -55,7 +42,7 @@ def _to_draft(index: int, raw: RawEntry, source: str, mapping: TableMapping) -> 
         value = getattr(raw, field, None)
         if value is None:
             continue
-        if not _appears_in_source(float(value), source):
+        if not appears_in_source(float(value), source):
             logger.warning("prose_value_not_in_source", extra={"field": field, "value": value})
             label = field.replace("_", " ")
             issues.append(
