@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     ai_provider: Literal["auto", "openai_compatible", "stub"] = "auto"
     ai_api_key: SecretStr | None = None
     ai_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
-    ai_model: str = "gemini-2.5-flash"
+    ai_model: str = "gemini-flash-lite-latest"
     ai_timeout_seconds: float = 60.0
 
     max_upload_bytes: int = 10 * 1024 * 1024

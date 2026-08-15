@@ -9,6 +9,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, File, Query, Request, UploadFile, status
+from starlette.concurrency import run_in_threadpool
 
 from app.ai import get_provider
 from app.core.config import get_settings
@@ -62,7 +63,12 @@ async def preview_pdf_import(
 
     # The bytes live only for this call: they are parsed here and never written
     # to disk or to the database.
-    return imports_service.build_preview(
+    #
+    # Off the event loop, deliberately. Parsing a PDF is CPU-bound and the AI
+    # call is blocking network I/O — several seconds in which this coroutine
+    # would otherwise stall *every* other request the process is serving.
+    return await run_in_threadpool(
+        imports_service.build_preview,
         session,
         current_user.id,
         content=content,

@@ -47,12 +47,18 @@ endpoint — so choosing one is two lines of `.env`:
 
 | Provider | Free? | `.env` |
 |---|---|---|
-| **Google Gemini** (default) | Free tier, no card | `AI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/`<br>`AI_MODEL=gemini-2.5-flash` |
+| **Google Gemini** (default) | Free tier, no card | `AI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/`<br>`AI_MODEL=gemini-flash-lite-latest` |
 | **Groq** | Free tier, no card | `AI_BASE_URL=https://api.groq.com/openai/v1`<br>`AI_MODEL=llama-3.3-70b-versatile` |
 | **Ollama** | Free, local, no account | `AI_BASE_URL=http://localhost:11434/v1`<br>`AI_MODEL=llama3.1` · set `AI_PROVIDER=openai_compatible` |
 | **OpenAI** | Paid | `AI_BASE_URL=https://api.openai.com/v1`<br>`AI_MODEL=gpt-4o-mini` |
 
 `backend/.env.example` carries all four ready to uncomment.
+
+**Watch the per-model daily cap.** Gemini's free tier limits requests *per model, per day*, and the
+limits differ sharply: `gemini-flash-latest` is the sharper reader but allows only ~20 requests/day —
+one afternoon of testing exhausts it — so the default is `gemini-flash-lite-latest`, which has a far
+larger allowance and handled every fixture correctly. Hitting the cap returns a `429` naming the limit
+and suggesting a model change, rather than a generic failure.
 
 ---
 
@@ -246,10 +252,11 @@ Moving to PostgreSQL is a `DATABASE_URL` change plus `make migrate`.
 | 3c | AI photo extraction (FR-5) | Not started |
 | 4 | Docs, coverage, security review | Not started |
 
-**Known gap:** the import pipeline has only been exercised against the stub provider. The stub matches
-column headers by keyword, which proves every stage runs and every status is reachable — but it says
-nothing about how well a real model reads a diary it has never seen. Point `AI_API_KEY` at a free
-Gemini key and re-upload the fixtures to find out; that is the check the test suite cannot stand in for.
+**Verified against live Gemini.** Every fixture has been run end-to-end through the browser with a real
+free-tier key: the per-100g table had its basis, serving column and day-first dates all inferred
+correctly and scaled to 123/190/118/146 kcal; the prose diary yielded 6 entries with correct dates and
+meals; the scanned PDF was rejected with a clear message. The automated suite still runs entirely
+against the stub, so `make test` needs no key, no network, and no quota.
 
 Scanned PDFs are detected and rejected with a clear message rather than silently returning zero rows.
 `ExtractedDocument` carries `has_text_layer` and the page count so Phase 3c's vision model can pick

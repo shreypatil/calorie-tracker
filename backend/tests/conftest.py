@@ -15,6 +15,12 @@ from sqlalchemy.orm import Session, sessionmaker
 os.environ.setdefault("ENVIRONMENT", "test")
 os.environ.setdefault("JWT_SECRET", "test-secret-not-used-anywhere-real")
 
+# Force the stub provider, overriding any real key in the developer's .env.
+# Without this, a configured AI_API_KEY makes `auto` pick the real provider and
+# the suite silently starts calling a paid API over the network — slow,
+# non-deterministic, and quietly billable. Tests must never leave the machine.
+os.environ["AI_PROVIDER"] = "stub"
+
 from app.core.config import get_settings  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.db.session import create_db_engine, get_db  # noqa: E402

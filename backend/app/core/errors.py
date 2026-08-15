@@ -66,6 +66,18 @@ class ExternalServiceError(AppError):
     error_type = "/errors/external-service"
 
 
+class UpstreamRateLimitError(AppError):
+    """The AI provider refused because a quota or rate limit was reached.
+
+    Distinct from a 502: nothing is broken and retrying later will work, which
+    is a materially different thing to tell the user.
+    """
+
+    status_code = status.HTTP_429_TOO_MANY_REQUESTS
+    title = "AI Provider Limit Reached"
+    error_type = "/errors/upstream-rate-limit"
+
+
 class PayloadTooLargeError(AppError):
     status_code = status.HTTP_413_CONTENT_TOO_LARGE
     title = "Payload Too Large"

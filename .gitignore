@@ -33,3 +33,6 @@ shots/
 
 # Local working context for AI assistants — kept out of the published repo
 CLAUDE.md
+
+# Dev notes and docs
+keys_human_readable.md
