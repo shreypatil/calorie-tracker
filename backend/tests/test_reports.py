@@ -354,3 +354,56 @@ def test_default_range_is_the_last_four_weeks(client: TestClient, auth_headers: 
     assert len(body["points"]) == 28
     assert body["date_to"] == date.today().isoformat()
     assert body["date_from"] == (date.today() - timedelta(days=27)).isoformat()
+
+
+def test_aggregate_fill_gaps_emits_zero_buckets(client: TestClient, dataset: dict) -> None:
+    """A chart needs every bucket present; a line that skips a day misreports it.
+
+    Thursday the 18th has nothing logged. Without gap filling the series jumps from the 17th
+    straight to the 19th and the chart slopes through the missing day as if intake were
+    somewhere between the two.
+    """
+    response = client.get(
+        "/api/v1/reports/aggregate?metrics=calories&group_by=day&fill_gaps=true"
+        "&date_from=2026-06-15&date_to=2026-06-19",
+        headers=dataset,
+    )
+
+    rows = response.json()["rows"]
+    assert [row["day"] for row in rows] == [
+        "2026-06-15",
+        "2026-06-16",
+        "2026-06-17",
+        "2026-06-18",
+        "2026-06-19",
+    ]
+    assert [row["calories"] for row in rows] == [500, 0, 1000, 0, 250]
+
+
+def test_aggregate_stays_sparse_by_default(client: TestClient, dataset: dict) -> None:
+    """The opt-in must really be opt-in — existing callers keep the sparse contract."""
+    response = client.get(
+        "/api/v1/reports/aggregate?metrics=calories&group_by=day"
+        "&date_from=2026-06-15&date_to=2026-06-19",
+        headers=dataset,
+    )
+    assert [row["day"] for row in response.json()["rows"]] == [
+        "2026-06-15",
+        "2026-06-17",
+        "2026-06-19",
+    ]
+
+
+def test_fill_gaps_is_ignored_for_non_date_grouping(client: TestClient, dataset: dict) -> None:
+    """There is no such thing as a missing meal type, so the flag must not change anything."""
+    response = client.get(
+        "/api/v1/reports/aggregate?metrics=calories&group_by=meal_type&fill_gaps=true"
+        "&date_from=2026-06-15&date_to=2026-06-19",
+        headers=dataset,
+    )
+    assert response.status_code == 200
+    assert {row["meal_type"] for row in response.json()["rows"]} == {
+        "breakfast",
+        "dinner",
+        "lunch",
+    }

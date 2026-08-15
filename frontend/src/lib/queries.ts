@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, query } from "./api";
 import type {
+  AggregateResponse,
   ChatMessage,
   ChatTurn,
   DailySummary,
@@ -319,5 +320,45 @@ export function useCommitPhotoRows() {
   return useMutation({
     mutationFn: (entries: unknown[]) => api.post<FoodEntry[]>("/entries/bulk", { entries }),
     onSuccess: invalidate,
+  });
+}
+
+// --- Custom aggregation (comments.md item 7) ------------------------------
+
+export interface AggregateRequest {
+  metrics: string[];
+  group_by: string[];
+  date_from: string;
+  date_to: string;
+  fill_gaps?: boolean;
+}
+
+/** The metric and dimension names the server will accept, straight from its registries. */
+export function useReportCatalogue() {
+  return useQuery({
+    queryKey: ["catalogue"],
+    queryFn: () => api.get<{ metrics: string[]; dimensions: string[] }>("/reports/catalogue"),
+    // The registries only change on deploy, so there is nothing to revalidate against.
+    staleTime: Infinity,
+  });
+}
+
+/**
+ * The open-ended report endpoint. `metrics` and `group_by` repeat as query params, which
+ * `query()` cannot express, so the search string is built here.
+ */
+export function useAggregate(request: AggregateRequest, enabled = true) {
+  return useQuery({
+    queryKey: ["aggregate", request],
+    enabled: enabled && request.metrics.length > 0,
+    queryFn: () => {
+      const search = new URLSearchParams();
+      for (const metric of request.metrics) search.append("metrics", metric);
+      for (const dimension of request.group_by) search.append("group_by", dimension);
+      search.set("date_from", request.date_from);
+      search.set("date_to", request.date_to);
+      if (request.fill_gaps) search.set("fill_gaps", "true");
+      return api.get<AggregateResponse>(`/reports/aggregate?${search}`);
+    },
   });
 }

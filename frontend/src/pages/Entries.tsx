@@ -1,6 +1,7 @@
 /** Log a meal, and browse what has been logged (FR-2, FR-3). */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { PageHeading } from "../components/Layout";
 import {
   Alert,
@@ -30,10 +31,23 @@ export function Entries() {
     page: 1,
     page_size: PAGE_SIZE,
   });
-  const [showForm, setShowForm] = useState(false);
+  // Arriving from "Log a meal" elsewhere in the app opens the form immediately, rather than
+  // landing the user on a page where they have to press the same button a second time. A search
+  // param rather than router state, so a reload or a shared link still opens it.
+  const [params, setParams] = useSearchParams();
+  const [showForm, setShowForm] = useState(params.get("log") === "1");
+  const formRef = useRef<HTMLDivElement>(null);
 
   const entries = useEntries(filters);
   const remove = useDeleteEntry();
+
+  useEffect(() => {
+    if (params.get("log") !== "1") return;
+    formRef.current?.scrollIntoView({ block: "start" });
+    // Consumed once: leaving it in the URL would re-open the form on every later navigation.
+    params.delete("log");
+    setParams(params, { replace: true });
+  }, [params, setParams]);
 
   // Any filter change resets to page 1 — staying on page 4 of a narrower
   // result set would show an empty screen.
@@ -56,7 +70,7 @@ export function Entries() {
       />
 
       {showForm && (
-        <div className="mb-5">
+        <div className="mb-5" ref={formRef}>
           <LogEntryForm onLogged={() => setShowForm(false)} />
         </div>
       )}

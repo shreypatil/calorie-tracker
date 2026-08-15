@@ -21,7 +21,7 @@ from app.schemas.report import (
 )
 from app.services import reports
 from app.services.reports import DIMENSIONS, METRICS, Granularity
-from app.services.reports.query import ReportFilters
+from app.services.reports.query import DATE_DIMENSIONS, ReportFilters
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -52,19 +52,42 @@ def aggregate_report(
     group_by: Annotated[list[str], Query(description="Dimension names to group by")] = [],  # noqa: B006
     date_from: DateFrom = None,
     date_to: DateTo = None,
+    fill_gaps: Annotated[
+        bool, Query(description="Emit empty date buckets as zeros; date grouping only")
+    ] = False,
 ) -> AggregateResponse:
     """Run an arbitrary metric-by-dimension aggregation.
 
     The open-ended extension point: any combination the registries allow is
     available without a code change.
+
+    `fill_gaps` emits a zero row for buckets with nothing logged, which is what
+    a chart needs — a line that skips a day slopes straight through it and
+    quietly misreports the gap. It is opt-in rather than automatic because the
+    sparse result is the honest answer for anything that is not a time series,
+    and callers already depend on it.
     """
-    rows = reports.aggregate(
-        session,
-        current_user.id,
-        metrics=metrics,
-        group_by=group_by,
-        filters=ReportFilters(date_from=date_from, date_to=date_to),
-    )
+    filters = ReportFilters(date_from=date_from, date_to=date_to)
+
+    if fill_gaps and len(group_by) == 1 and group_by[0] in DATE_DIMENSIONS:
+        start, end = _resolve_range(date_from, date_to)
+        rows = reports.aggregate_over_time(
+            session,
+            current_user.id,
+            metrics=metrics,
+            granularity=DATE_DIMENSIONS[group_by[0]],
+            date_from=start,
+            date_to=end,
+        )
+    else:
+        rows = reports.aggregate(
+            session,
+            current_user.id,
+            metrics=metrics,
+            group_by=group_by,
+            filters=filters,
+        )
+
     return AggregateResponse(group_by=group_by, metrics=metrics, rows=rows)
 
 

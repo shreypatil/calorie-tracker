@@ -1,11 +1,12 @@
 /** Today at a glance: the one question the app exists to answer. */
 
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { PageHeading } from "../components/Layout";
-import { Card, CardHeader, ErrorNote, Loading, Meter, Value } from "../components/ui";
+import { MealItemsPopover } from "../components/MealItemsPopover";
+import { Button, Card, CardHeader, ErrorNote, Loading, Meter, Value } from "../components/ui";
 import { TrendChart } from "../components/charts/TrendChart";
 import { ChartFrame } from "../components/charts/chartTheme";
-import { useDailySummary, useTrend } from "../lib/queries";
+import { useDailySummary, useEntries, useTrend } from "../lib/queries";
 import {
   MEAL_LABELS,
   daysAgo,
@@ -14,12 +15,18 @@ import {
   formatNumber,
   today,
 } from "../lib/format";
-import { MACROS, type DailySummary } from "../lib/types";
+import { MACROS, type DailySummary, type FoodEntry, type MealType } from "../lib/types";
 
 export function Dashboard() {
   const day = today();
+  const navigate = useNavigate();
   const summary = useDailySummary(day);
   const trend = useTrend({ date_from: daysAgo(13), date_to: day, granularity: "day" });
+
+  // Today's entries, so the by-meal breakdown can show *what* was eaten without another
+  // round trip when the user asks. Cheap: one day is at most a handful of rows.
+  const todaysEntries = useEntries({ date_from: day, date_to: day, page_size: 100 });
+  const byMeal = groupByMeal(todaysEntries.data?.items ?? []);
 
   if (summary.isLoading) return <Loading />;
   if (summary.error) return <ErrorNote error={summary.error} />;
@@ -32,6 +39,11 @@ export function Dashboard() {
       <PageHeading
         title={formatDayLabel(day)}
         description="Everything logged today, measured against your goal."
+        actions={
+          <Button variant="primary" onClick={() => navigate("/entries?log=1")}>
+            Log a meal
+          </Button>
+        }
       />
 
       <div className="grid gap-5 lg:grid-cols-3">
@@ -56,7 +68,7 @@ export function Dashboard() {
           </ChartFrame>
         </div>
 
-        <MealsPanel data={data} />
+        <MealsPanel data={data} byMeal={byMeal} />
       </div>
     </>
   );
@@ -149,7 +161,19 @@ function MacroPanel({ data }: { data: DailySummary }) {
   );
 }
 
-function MealsPanel({ data }: { data: DailySummary }) {
+function groupByMeal(entries: FoodEntry[]): Record<string, FoodEntry[]> {
+  const grouped: Record<string, FoodEntry[]> = {};
+  for (const entry of entries) (grouped[entry.meal_type] ??= []).push(entry);
+  return grouped;
+}
+
+function MealsPanel({
+  data,
+  byMeal,
+}: {
+  data: DailySummary;
+  byMeal: Record<string, FoodEntry[]>;
+}) {
   const logged = data.by_meal.some((meal) => meal.entry_count > 0);
 
   return (
@@ -161,9 +185,10 @@ function MealsPanel({ data }: { data: DailySummary }) {
             <tr key={meal.meal_type} className="border-b border-rule-soft last:border-0">
               <td className="px-5 py-2.5">{MEAL_LABELS[meal.meal_type]}</td>
               <td className="px-5 py-2.5 text-right text-ink-muted">
-                {meal.entry_count === 0
-                  ? "—"
-                  : `${meal.entry_count} ${meal.entry_count === 1 ? "item" : "items"}`}
+                <MealItemsPopover
+                  label={`Show what was eaten at ${MEAL_LABELS[meal.meal_type as MealType]}`}
+                  items={byMeal[meal.meal_type] ?? []}
+                />
               </td>
               <td className="px-5 py-2.5 text-right font-mono tabular">
                 {formatNumber(meal.calories)}
@@ -186,7 +211,7 @@ function MealsPanel({ data }: { data: DailySummary }) {
       </table>
       <div className="border-t border-rule px-5 py-3">
         <Link to="/entries" className="text-[13px] text-accent underline">
-          Log a meal
+          See all entries
         </Link>
       </div>
     </Card>

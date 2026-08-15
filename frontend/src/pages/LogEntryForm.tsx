@@ -49,6 +49,9 @@ const schema = z.object({
 
 type FormValues = z.input<typeof schema>;
 
+// Every micronutrient is listed explicitly. `reset()` only touches fields the object names, so
+// omitting them left them populated after Clear, after saving, and after a photo scan — one
+// missing set of keys causing three separate bugs.
 const DEFAULTS = {
   consumed_on: today(),
   meal_type: "breakfast",
@@ -59,6 +62,7 @@ const DEFAULTS = {
   protein_g: 0,
   carbs_g: 0,
   fat_g: 0,
+  ...Object.fromEntries(MICRONUTRIENTS.map((name) => [name, ""])),
 } as unknown as FormValues;
 
 export function LogEntryForm({ onLogged }: { onLogged?: () => void }) {
@@ -227,7 +231,14 @@ export function LogEntryForm({ onLogged }: { onLogged?: () => void }) {
         </div>
 
         <div className="mt-5 flex justify-end gap-2">
-          <Button type="button" onClick={() => reset(DEFAULTS)}>
+          <Button
+            type="button"
+            onClick={() => {
+              reset(DEFAULTS);
+              setShowMicros(false);
+              setScanNote(null);
+            }}
+          >
             Clear
           </Button>
           <Button type="submit" variant="primary" disabled={create.isPending}>

@@ -7,6 +7,9 @@ export type Granularity = "day" | "week" | "month";
 export const MEAL_TYPES: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
 
 export const MACROS = ["protein_g", "carbs_g", "fat_g"] as const;
+
+/** The figures a draft row exposes as editable columns. */
+export const DRAFT_MACROS = ["calories", ...MACROS] as const;
 export type Macro = (typeof MACROS)[number];
 
 export const MICRONUTRIENTS = [
@@ -261,6 +264,8 @@ export interface DraftMealItem {
   protein_g: number;
   carbs_g: number;
   fat_g: number;
+  /** Micronutrients the assistant supplied ride along and stay editable. */
+  [field: string]: unknown;
 }
 
 export interface ChatMessage {
@@ -292,4 +297,11 @@ export interface PhotoDraft {
   confidence: number;
   notes: string;
   rows: DraftRow[];
+}
+
+/** One row per group: the dimension values, then the metric totals. */
+export interface AggregateResponse {
+  group_by: string[];
+  metrics: string[];
+  rows: Record<string, string | number>[];
 }

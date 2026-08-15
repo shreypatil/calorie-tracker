@@ -53,16 +53,25 @@ export function ChartTooltip({
   );
 }
 
-/** Legend as real text with a colour chip — identity never rests on colour alone. */
-export function Legend({ series }: { series: { key: string; label?: string }[] }) {
+/**
+ * Legend as real text with a colour chip — identity never rests on colour alone.
+ *
+ * `color` overrides the per-nutrient token, which the overlay chart needs: there the colour
+ * comes from the series' slot rather than from which nutrient it happens to be.
+ */
+export function Legend({
+  series,
+}: {
+  series: { key: string; label?: string; color?: string }[];
+}) {
   return (
     <ul className="flex flex-wrap gap-x-4 gap-y-1">
-      {series.map(({ key, label }) => (
+      {series.map(({ key, label, color }) => (
         <li key={key} className="flex items-center gap-1.5 text-[12px] text-ink-soft">
           <span
             aria-hidden
             className="inline-block size-2.5 rounded-[2px]"
-            style={{ backgroundColor: SERIES[key as keyof typeof SERIES] }}
+            style={{ backgroundColor: color ?? SERIES[key as keyof typeof SERIES] }}
           />
           {label ?? nutrientLabel(key)}
         </li>

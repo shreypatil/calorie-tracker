@@ -6,6 +6,7 @@
  * motion anywhere.
  */
 
+import { useRef } from "react";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
 
 import { cx } from "../lib/cx";
@@ -109,6 +110,56 @@ export function Input({ className, ...rest }: InputHTMLAttributes<HTMLInputEleme
 
 export function Select({ className, ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {
   return <select className={cx(CONTROL, className)} {...rest} />;
+}
+
+/**
+ * A file control that reads as one button plus a filename.
+ *
+ * The native `<input type="file">` renders its button and its "no file selected" text as a single
+ * fused control that cannot be styled and does not look like anything else in the app. The fix is
+ * the standard one: hide the input, drive it from a real Button, and show the chosen name as
+ * separate adjacent text. The input keeps its own accessible name so it is still reachable.
+ */
+export function FilePicker({
+  accept,
+  label,
+  onSelect,
+  disabled,
+  filename,
+  buttonText = "Choose a file",
+}: {
+  accept: string;
+  label: string;
+  onSelect: (file: File) => void;
+  disabled?: boolean;
+  filename?: string | null;
+  buttonText?: string;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <Button type="button" disabled={disabled} onClick={() => ref.current?.click()}>
+        {buttonText}
+      </Button>
+      <span className={cx("text-[13px]", filename ? "text-ink-soft" : "text-ink-muted")}>
+        {filename ?? "No file chosen"}
+      </span>
+      <input
+        ref={ref}
+        type="file"
+        accept={accept}
+        aria-label={label}
+        className="sr-only"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) onSelect(file);
+          // Cleared so re-picking the same file still fires a change event.
+          event.target.value = "";
+        }}
+      />
+    </div>
+  );
 }
 
 /** A number in the house style: mono, tabular, right-aligned by default. */

@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { PageHeading } from "../components/Layout";
-import { Card, ErrorNote, Loading, Select, Value } from "../components/ui";
+import { Button, Card, ErrorNote, Field, Input, Loading, Select, Value } from "../components/ui";
 import { ChartFrame, Legend } from "../components/charts/chartTheme";
+import { CustomChart } from "../components/charts/CustomChart";
 import { TrendChart } from "../components/charts/TrendChart";
 import { MacroChart } from "../components/charts/MacroChart";
 import { GoalVsActualChart } from "../components/charts/GoalVsActualChart";
@@ -12,53 +13,99 @@ import { useGoalVsActual, useMacros, useMicros, useTrend } from "../lib/queries"
 import { daysAgo, formatAmount, formatDate, today } from "../lib/format";
 import { MACROS, type Granularity } from "../lib/types";
 
-const RANGES = [
-  { label: "Last 14 days", days: 13, granularity: "day" as const },
-  { label: "Last 28 days", days: 27, granularity: "day" as const },
-  { label: "Last 12 weeks", days: 83, granularity: "week" as const },
+/** Shortcuts, not the only way in — the dates themselves are directly editable. */
+const PRESETS = [
+  { label: "14 days", days: 13, granularity: "day" as const },
+  { label: "28 days", days: 27, granularity: "day" as const },
+  { label: "12 weeks", days: 83, granularity: "week" as const },
+  { label: "12 months", days: 364, granularity: "month" as const },
 ];
 
 export function Reports() {
-  const [rangeIndex, setRangeIndex] = useState(1);
-  const preset = RANGES[rangeIndex];
-
-  const range = {
-    date_from: daysAgo(preset.days),
+  const [range, setRange] = useState({
+    date_from: daysAgo(27),
     date_to: today(),
-    granularity: preset.granularity as Granularity,
-  };
+    granularity: "day" as Granularity,
+  });
 
   const trend = useTrend(range);
   const macros = useMacros(range);
   const micros = useMicros({ date_from: range.date_from, date_to: range.date_to });
   const comparison = useGoalVsActual(range);
 
-  const rangeControl = (
-    <Select
-      className="w-auto"
-      aria-label="Reporting period"
-      value={rangeIndex}
-      onChange={(event) => setRangeIndex(Number(event.target.value))}
-    >
-      {RANGES.map((option, index) => (
-        <option key={option.label} value={index}>
-          {option.label}
-        </option>
-      ))}
-    </Select>
-  );
-
-  const bucketNote = `Grouped by ${preset.granularity}.`;
+  const bucketNote = `Grouped by ${range.granularity}.`;
 
   return (
     <>
       <PageHeading
         title="Reports"
         description={`${formatDate(range.date_from)} – ${formatDate(range.date_to)}`}
-        actions={rangeControl}
       />
 
+      <Card className="mb-5 p-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Field label="From">
+            <Input
+              type="date"
+              max={range.date_to}
+              value={range.date_from}
+              onChange={(event) =>
+                setRange((current) => ({ ...current, date_from: event.target.value }))
+              }
+            />
+          </Field>
+          <Field label="To">
+            <Input
+              type="date"
+              min={range.date_from}
+              max={today()}
+              value={range.date_to}
+              onChange={(event) =>
+                setRange((current) => ({ ...current, date_to: event.target.value }))
+              }
+            />
+          </Field>
+          <Field label="Group by">
+            <Select
+              value={range.granularity}
+              onChange={(event) =>
+                setRange((current) => ({
+                  ...current,
+                  granularity: event.target.value as Granularity,
+                }))
+              }
+            >
+              {(["day", "week", "month"] as Granularity[]).map((option) => (
+                <option key={option} value={option}>
+                  {option[0].toUpperCase() + option.slice(1)}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Quick ranges">
+            <div className="flex flex-wrap gap-1.5">
+              {PRESETS.map((preset) => (
+                <Button
+                  key={preset.label}
+                  type="button"
+                  onClick={() =>
+                    setRange({
+                      date_from: daysAgo(preset.days),
+                      date_to: today(),
+                      granularity: preset.granularity,
+                    })
+                  }
+                >
+                  {preset.label}
+                </Button>
+              ))}
+            </div>
+          </Field>
+        </div>
+      </Card>
+
       <div className="space-y-5">
+        <CustomChart dateFrom={range.date_from} dateTo={range.date_to} />
         <ChartFrame title="Calorie intake" description={`Energy logged over time. ${bucketNote}`}>
           {trend.isLoading ? (
             <Loading />

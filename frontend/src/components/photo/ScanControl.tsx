@@ -16,7 +16,13 @@ import { useRef, useState } from "react";
 
 import { ApiError } from "../../lib/api";
 import { useAnalyzeImage, useCommitPhotoRows } from "../../lib/queries";
-import type { DraftRow, MealType, PhotoDraft, PhotoKind } from "../../lib/types";
+import {
+  MICRONUTRIENTS,
+  type DraftRow,
+  type MealType,
+  type PhotoDraft,
+  type PhotoKind,
+} from "../../lib/types";
 import { MealDraftTable, type DraftRowView } from "../MealDraftTable";
 import { Alert, Button } from "../ui";
 
@@ -43,6 +49,11 @@ function splitIssues(rows: DraftRow[]): {
   };
 }
 
+/**
+ * Every nutrient the extraction produced travels into the editable row, not just the four shown
+ * as columns — the expander edits micronutrients too, and dropping them here would silently
+ * discard values the model did read off the plate.
+ */
 function toView(row: DraftRow): DraftRowView {
   const entry = row.entry!;
   return {
@@ -51,6 +62,12 @@ function toView(row: DraftRow): DraftRowView {
     quantity: entry.quantity,
     unit: entry.unit,
     calories: entry.calories,
+    protein_g: entry.protein_g,
+    carbs_g: entry.carbs_g,
+    fat_g: entry.fat_g,
+    ...Object.fromEntries(
+      MICRONUTRIENTS.map((name) => [name, entry[name]]).filter(([, value]) => value != null),
+    ),
   };
 }
 

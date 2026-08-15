@@ -254,7 +254,7 @@ not a remark. There is no typing animation; the waiting state is a line of text.
 ## Testing
 
 ```bash
-make test    # 224 backend tests, plus the frontend type check and build
+make test    # 227 backend tests, plus the frontend type check and build
 make lint
 ```
 

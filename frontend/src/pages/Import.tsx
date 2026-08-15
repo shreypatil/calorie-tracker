@@ -14,7 +14,7 @@ import {
   CardHeader,
   EmptyState,
   Field,
-  Input,
+  FilePicker,
   Loading,
   Value,
 } from "../components/ui";
@@ -111,10 +111,13 @@ export function Import() {
             className="max-w-md"
             hint="Exported from a tracking app or a spreadsheet. Scanned pages aren't supported yet."
           >
-            <Input
-              type="file"
+            <FilePicker
               accept="application/pdf,.pdf"
-              onChange={(event) => handleFile(event.target.files?.[0] ?? null)}
+              label="PDF food diary"
+              buttonText="Choose a PDF"
+              filename={file?.name ?? null}
+              disabled={parse.isPending}
+              onSelect={(chosen) => handleFile(chosen)}
             />
           </Field>
 
