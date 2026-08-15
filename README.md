@@ -109,8 +109,10 @@ frontend/src/
 Six decisions shape the rest of the codebase:
 
 **Routers are thin; services hold the logic.** Routes parse, authorize, and delegate. This is what
-lets the chat interface (Phase 3b) call the *same* `create_entry` the REST API calls, rather than
-growing a second, divergent implementation of the app.
+lets the chat assistant's `log_meal` tool call the *same* `create_entry` the REST API calls, rather
+than growing a second, divergent implementation of the app. The payoff is concrete: validation,
+user scoping and goal versioning cannot drift between the two interfaces, because there is only one
+of each.
 
 **Services take the owning `user_id`, always.** There is no way to fetch or mutate a record by ID
 alone — `get_entry(session, user_id, entry_id)` has no single-argument sibling. Isolation therefore
@@ -276,7 +278,7 @@ ready and scalable" requirement — single-writer, not network accessible, awkwa
 the code is written to make that honest rather than to hide it:
 
 - all access goes through SQLAlchemy, with no SQLite-specific SQL in application code;
-- the one dialect-dependent piece will be a single `date_bucket()` helper in the reports layer;
+- the one dialect-dependent piece is a single `date_bucket()` helper in the reports layer;
 - migrations use Alembic batch mode, so they behave the same on both backends.
 
 Moving to PostgreSQL is a `DATABASE_URL` change plus `make migrate`.

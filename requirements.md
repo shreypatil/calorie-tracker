@@ -24,16 +24,18 @@ including the AI ones without supplying any API keys.
 |---|---|---|
 | Purpose | Take-home / portfolio demo | Prioritizes complete coverage of the requirements, readable code, and a frictionless local run over operational depth. |
 | Backend | Python 3.12 + FastAPI | Pydantic v2 validation satisfies NFR-6 natively, auto-generated OpenAPI docs are directly reviewable, and dependency injection keeps auth and DB session wiring clean. |
-| Frontend | React 18 + TypeScript + Vite | Mainstream, fast dev loop, and a clean separation from the backend as NFR-1 requires. |
+| Frontend | React 19 + TypeScript + Vite + Tailwind | Mainstream, fast dev loop, and a clean separation from the backend as NFR-1 requires. |
 | Charts | Recharts | Small API, sensible defaults, covers the line / stacked-bar / pie cases the reports need. |
 | Database | SQLite via SQLAlchemy 2.0 + Alembic | Zero setup for whoever runs the project. All access goes through the ORM with no SQLite-specific SQL outside one helper, so PostgreSQL is a connection-string change plus a migration run. See §7.1 for the honest limitation. |
 | Auth | Own JWT auth (email + password) | No external service or keys needed to run the project; argon2 hashing with rotating refresh tokens. |
-| AI provider | Provider-agnostic, stub by default | The app must run with no API key. A deterministic stub backs every AI feature; setting `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` upgrades to real inference with no code change. |
+| AI provider | Provider-agnostic, stub by default | The app must run with no API key. A deterministic stub backs every AI feature; setting `AI_API_KEY` upgrades to real inference with no code change. One OpenAI-compatible adapter serves Gemini, Groq, Ollama and OpenAI alike, so choosing a provider is two lines of `.env`. |
 | Nutrition data | AI + manual entry only | No external food database initially. A `FoodLookupSource` seam exists so a free source (Open Food Facts, USDA FoodData Central) can be added later without touching routes or models. |
 | Micronutrients | Fixed typed columns + JSON overflow | The common micros are typed columns so they can be aggregated and charted; anything extra the AI extracts lands in a display-only JSON field. |
 | Reports | One composable aggregation layer | Reports are expected to grow well past the required set, so a new report must mean a new caller, not new SQL. See FR-4 and §5.3. |
 | Uploads | Processed in memory, never stored | The extracted values are the only durable output; the user confirms them before anything is written. No job table, no queue, no stored bytes. |
 | Chat | One conversation per user | Chat is a control surface for the app, not a messaging product. Multi-session history would be unused complexity. |
+| Chat actions | Tool calling through a server-side registry | The model names a tool and supplies arguments; it never reaches the database. Names resolve through a registry and arguments are validated against a schema before any service runs, so the surface the model can reach is exactly what was deliberately exposed. |
+| Chat writes | Proposed, then confirmed | Reads answer directly, but anything that changes data is returned as a draft and applied only on an explicit confirm. With no food database, logged nutrition figures are the model's estimate — acceptable only because a person reviews and can correct every number before it is written. |
 | Sequencing | Phased: core → reports → AI | Each phase ends runnable and demoable. |
 
 ---
@@ -119,6 +121,10 @@ goals, asking nutritional questions, and getting weekly summaries — without to
   between the two interfaces.
 - Each user has one persistent conversation that survives a page refresh, and can clear it.
 - Tools are scoped to the authenticated user; the chat cannot read or modify another user's data under any prompt.
+  The authenticated user's ID is supplied by the server and is never a tool argument, so no prompt can widen scope.
+- **No tool that writes is executed by the conversation.** A change is returned as a proposed action and applied only
+  by an explicit confirmation, which re-validates the arguments and accepts corrections to them first.
+- Read tools resolve within a bounded number of steps; the turn always ends with a reply rather than an error.
 - With no API key configured, the stub provider returns deterministic tool calls so the flow is fully exercisable.
 
 ### FR-7 — Multi-user support
@@ -261,7 +267,7 @@ All endpoints live under `/api/v1`. All list endpoints are paginated per NFR-3.
 | Reports | `GET /reports/aggregate` · `GET /reports/daily-summary` · `GET /reports/trend` · `GET /reports/macros` · `GET /reports/micros` · `GET /reports/goal-vs-actual` |
 | AI | `POST /ai/analyze-image` → draft entry, nothing persisted |
 | Imports | `POST /imports/pdf` → draft rows, nothing persisted; commit via `POST /entries/bulk` |
-| Chat | `GET /chat/messages` · `POST /chat/messages` · `DELETE /chat/messages` |
+| Chat | `GET /chat/messages` · `POST /chat/messages` → reply plus any proposed actions, nothing persisted beyond the transcript · `POST /chat/actions/{id}/confirm` · `POST /chat/actions/{id}/discard` · `DELETE /chat/messages` |
 
 ---
 
@@ -294,5 +300,7 @@ SQL is one date-bucketing helper, and migrating to PostgreSQL is a connection-st
 | **Micro** | Micronutrient: a vitamin or mineral, plus fiber, sugar, and cholesterol as tracked here. |
 | **Goal version** | A row in `goals` with an `effective_from` date. The version in force on a date is the latest one at or before it. |
 | **Draft entry / draft rows** | Nutritional data extracted from a photo or PDF, returned to the client for review. Not persisted until the user confirms. |
+| **Proposed action** | A change the chat assistant has asked to make, held against the message that proposed it. It carries the validated arguments it would run with, and does nothing until confirmed or discarded. |
+| **Tool** | One named, schema-validated operation the chat assistant may request. Each is a thin delegation to the same service function the REST API uses. |
 | **Import batch** | A record of one confirmed PDF import, linking the entries it created so the import can be undone. |
 | **Metric / dimension** | The measures and groupings in the reports registries — what is summed, and what it is grouped by. |
