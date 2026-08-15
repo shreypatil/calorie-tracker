@@ -1,0 +1,29 @@
+services:
+  api:
+    build: ./backend
+    environment:
+      ENVIRONMENT: development
+      DEBUG: "true"
+      DATABASE_URL: sqlite:////srv/data/calorie_tracker.db
+      JWT_SECRET: dev-only-insecure-secret-change-me
+      AI_PROVIDER: auto
+    volumes:
+      # Named volume so the database survives rebuilds.
+      - api-data:/srv/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  web:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  api-data:

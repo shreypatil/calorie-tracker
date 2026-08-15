@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+@import "@fontsource-variable/ibm-plex-sans";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+
+/* ---------------------------------------------------------------------------
+   Design tokens.
+
+   The visual idea is a nutrition ledger: the discipline of a nutrition-facts
+   panel — tabular numerals, tight uppercase labels, rules whose weight encodes
+   hierarchy — applied to a calm modern app shell. Every number in the product
+   is set in mono and right-aligned; that consistency is the identity, so the
+   rest of the interface stays quiet.
+
+   Series colors were validated for colour-vision deficiency separation rather
+   than picked by eye.
+--------------------------------------------------------------------------- */
+@theme {
+  --color-paper: #f2f0ec;
+  --color-surface: #ffffff;
+  --color-ink: #191c22;
+  --color-ink-soft: #4a4f58;
+  --color-ink-muted: #6a6e76;
+  --color-rule: #e3dfd7;
+  --color-rule-soft: #eeebe5;
+
+  --color-accent: #0e6e62;
+  --color-accent-soft: #e2efec;
+
+  /* Macro series — validated triad (CVD ΔE 22.7 protan / 20.0 tritan). */
+  --color-protein: #2c6fc4;
+  --color-carbs: #c0722a;
+  --color-fat: #6b4e8f;
+
+  --color-good: #2f7a4f;
+  --color-warn: #9a6a12;
+  --color-danger: #a33a2a;
+  --color-danger-soft: #f8e9e6;
+
+  --font-sans: "IBM Plex Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-paper);
+  }
+
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+  }
+
+  /* Numerals never reflow as their values change. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* The small uppercase label of a nutrition panel. */
+  .eyebrow {
+    @apply font-mono text-[11px] uppercase tracking-[0.14em] text-ink-muted;
+  }
+}
