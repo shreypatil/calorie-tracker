@@ -5,9 +5,9 @@ with AI-assisted entry from photos and PDFs, and a chat interface that can drive
 
 Full specification: [`requirements.md`](./requirements.md).
 
-> **Status: Phase 2 of 4 complete.** Auth, goals, entries, listing, the reporting layer and the web
-> app are built, tested, and runnable. The AI features — photo extraction, PDF import, and chat —
-> are not yet built. See [Build status](#build-status).
+> **Status: Phases 1–3a complete.** Auth, goals, entries, listing, the reporting layer, the web app
+> and PDF bulk import are built, tested, and runnable. Chat (3b) and photo extraction (3c) are not
+> yet built. See [Build status](#build-status).
 
 ---
 
@@ -37,9 +37,22 @@ Then open <http://localhost:5173> and sign in as `demo@example.com` / `demo-pass
 
 ### No API keys required
 
-The app runs fully without any credentials. AI features are built behind a provider interface whose
-default implementation is a deterministic stub, so a reviewer can exercise every feature on a fresh
-clone. Setting `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` upgrades to real inference with no code change.
+The app runs fully without any credentials. AI features sit behind a provider interface whose default
+implementation is a deterministic stub, so a reviewer can exercise every feature — including PDF
+import — on a fresh clone with no account, no key, and no network.
+
+Setting `AI_API_KEY` switches to real inference with no code change. One adapter serves every
+provider, because OpenAI, Google Gemini, Groq and a locally-run Ollama all expose an OpenAI-compatible
+endpoint — so choosing one is two lines of `.env`:
+
+| Provider | Free? | `.env` |
+|---|---|---|
+| **Google Gemini** (default) | Free tier, no card | `AI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/`<br>`AI_MODEL=gemini-2.5-flash` |
+| **Groq** | Free tier, no card | `AI_BASE_URL=https://api.groq.com/openai/v1`<br>`AI_MODEL=llama-3.3-70b-versatile` |
+| **Ollama** | Free, local, no account | `AI_BASE_URL=http://localhost:11434/v1`<br>`AI_MODEL=llama3.1` · set `AI_PROVIDER=openai_compatible` |
+| **OpenAI** | Paid | `AI_BASE_URL=https://api.openai.com/v1`<br>`AI_MODEL=gpt-4o-mini` |
+
+`backend/.env.example` carries all four ready to uncomment.
 
 ---
 
@@ -76,7 +89,8 @@ backend/app/
   services/           all business logic
     reports/          the aggregation layer every report is built on
   api/v1/routers/     HTTP layer only
-  ai/                 provider interface + adapters   (Phase 3)
+  ai/                 provider Protocol, stub, and one OpenAI-compatible adapter
+  services/imports/   PDF extraction, mapping application, preview, undo
   alembic/            migrations
 
 frontend/src/
@@ -85,10 +99,10 @@ frontend/src/
   pages/              one file per screen
 ```
 
-Five decisions shape the rest of the codebase:
+Six decisions shape the rest of the codebase:
 
 **Routers are thin; services hold the logic.** Routes parse, authorize, and delegate. This is what
-lets the chat interface (Phase 3) call the *same* `create_entry` the REST API calls, rather than
+lets the chat interface (Phase 3b) call the *same* `create_entry` the REST API calls, rather than
 growing a second, divergent implementation of the app.
 
 **Services take the owning `user_id`, always.** There is no way to fetch or mutate a record by ID
@@ -120,6 +134,21 @@ The one piece of SQL that SQLite and PostgreSQL genuinely disagree about — tru
 day, week, or month — is isolated in a single compiled construct in `services/reports/buckets.py`.
 Everything else in the reporting layer is written once and runs unchanged on either backend.
 
+**The AI describes the document; our code reads the values.** A PDF food diary has no fixed schema —
+column names, ordering, date format and meal vocabulary all vary per file. So the model is shown a
+header plus ~15 sample rows and asked for a *mapping*: which column is calories, whether dates are
+day-first, whether values are per 100g. Our own code then parses every figure out of the document
+using that mapping. A model cannot hallucinate a calorie count it was never asked to produce, and the
+call stays the same size whether the diary has 12 rows or 400.
+
+The prose fallback, used only when there is no table at all, is the one place the model transcribes.
+There every number it returns is checked to literally appear in the source text; one that doesn't is
+dropped and the row flagged. Those rows are never marked ready, so a human sees them all.
+
+Nothing is written until the user confirms. `POST /imports/pdf` returns draft rows and a plain-language
+summary of what was understood; committing goes through the same `POST /entries/bulk` that manual
+entry uses, tagged as one undoable import batch.
+
 ### Cross-cutting behaviour
 
 | Concern | How it works |
@@ -144,12 +173,13 @@ one series carries a text legend, so identity never rests on colour alone. The e
 micronutrient summary is a table with meters rather than a chart — eleven hues nobody can tell apart
 would be worse than numbers.
 
-Screens: sign in / register · Today · Entries (filter, paginate, log a meal) · Reports · Goals.
+Screens: sign in / register · Today · Entries (filter, paginate, log a meal) · Reports · Goals ·
+Import (upload, review, commit, undo).
 
 ## Testing
 
 ```bash
-make test    # 91 backend tests, plus the frontend type check and build
+make test    # 161 backend tests, plus the frontend type check and build
 make lint
 ```
 
@@ -162,6 +192,17 @@ the registries is exercised, unknown names are rejected, empty days are gap-fill
 buckets land on Mondays, and goal-vs-actual is checked against the goal version in force — including
 across a mid-week goal change.
 
+Import is tested against four committed PDF fixtures, each standing for a real failure mode — a clean
+table, per-100g values with units in the header, a prose diary with no table, and a page with no text
+layer. Regenerate them with `python -m tests.fixtures.make_fixtures`. Beyond the happy path, the suite
+asserts the things that would be quiet bugs: that a preview writes nothing, that a fabricated number
+absent from the source is discarded rather than imported, that undo removes the *entries* and not just
+the batch row, and that one user cannot see or undo another's import.
+
+Because these run against the stub provider they need no key and no network. That also means they
+prove the pipeline, not the quality of a real model's reading — see the caveat under
+[Build status](#build-status).
+
 The UI is checked by driving a real browser:
 
 ```bash
@@ -170,7 +211,8 @@ npm run screenshots -- ./shots    # in frontend/, with the app running
 ```
 
 It signs in as the demo user, walks every page, writes a PNG per screen, and fails loudly on any
-console error.
+console error. `node scripts/import-walkthrough.mjs ./shots <file.pdf>` goes further on the import
+flow specifically: upload, re-read with a corrected date format, commit, and undo.
 
 ---
 
@@ -199,8 +241,19 @@ Moving to PostgreSQL is a `DATABASE_URL` change plus `make migrate`.
 |---|---|---|
 | 1 | Scaffold, Docker, migrations, error/pagination/logging primitives, auth (FR-7), goals (FR-1), entries CRUD and filtered listing (FR-2, FR-3), seed, tests | **Complete** |
 | 2 | Composable aggregation layer, report endpoints, the web app and its four visualizations (FR-4) | **Complete** |
-| 3 | AI provider abstraction, photo extraction (FR-5), PDF import (FR-8), chat (FR-6) | Not started |
+| 3a | AI provider abstraction, PDF bulk import with preview and undo (FR-8) | **Complete** |
+| 3b | Conversational chat interface (FR-6) | Not started |
+| 3c | AI photo extraction (FR-5) | Not started |
 | 4 | Docs, coverage, security review | Not started |
+
+**Known gap:** the import pipeline has only been exercised against the stub provider. The stub matches
+column headers by keyword, which proves every stage runs and every status is reachable — but it says
+nothing about how well a real model reads a diary it has never seen. Point `AI_API_KEY` at a free
+Gemini key and re-upload the fixtures to find out; that is the check the test suite cannot stand in for.
+
+Scanned PDFs are detected and rejected with a clear message rather than silently returning zero rows.
+`ExtractedDocument` carries `has_text_layer` and the page count so Phase 3c's vision model can pick
+them up, which is one branch in `services/imports/preview.py`.
 
 ### Endpoints available now
 
@@ -219,7 +272,7 @@ DELETE /api/v1/goals/{id}         GET    /api/v1/reports/aggregate
                                   GET    /api/v1/reports/catalogue
 GET    /health                    GET    /api/v1/reports/daily-summary
                                   GET    /api/v1/reports/trend
-                                  GET    /api/v1/reports/macros
-                                  GET    /api/v1/reports/micros
-                                  GET    /api/v1/reports/goal-vs-actual
+POST   /api/v1/imports/pdf        GET    /api/v1/reports/macros
+GET    /api/v1/imports            GET    /api/v1/reports/micros
+DELETE /api/v1/imports/{id}       GET    /api/v1/reports/goal-vs-actual
 ```

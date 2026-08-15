@@ -4,11 +4,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, query } from "./api";
 import type {
   DailySummary,
+  ImportBatch,
+  PdfImportPreview,
   FoodEntry,
   Goal,
   GoalVsActual,
   Granularity,
   MacroBreakdown,
+  DateFormat,
   MealType,
   MicroSummary,
   Page,
@@ -160,5 +163,60 @@ export function useRecordWeight() {
     mutationFn: (body: { logged_on: string; weight_kg: number }) =>
       api.post<WeightLog>("/weights", body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["weights"] }),
+  });
+}
+
+// --- Import (FR-8) --------------------------------------------------------
+
+export interface PreviewRequest {
+  file: File;
+  date_format?: DateFormat;
+  default_meal_type?: MealType | "";
+}
+
+/** Upload a PDF and get draft rows back. Nothing is saved by this call. */
+export function usePreviewImport() {
+  return useMutation({
+    mutationFn: ({ file, date_format, default_meal_type }: PreviewRequest) =>
+      api.upload<PdfImportPreview>(
+        `/imports/pdf${query({ date_format, default_meal_type })}`,
+        file,
+      ),
+  });
+}
+
+/** Commit reviewed rows. Reuses the same bulk endpoint manual entry uses. */
+export function useCommitImport() {
+  const invalidate = useInvalidateOnEntryChange();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ entries, filename }: { entries: unknown[]; filename: string }) =>
+      api.post<FoodEntry[]>("/entries/bulk", {
+        entries,
+        import_filename: filename,
+      }),
+    onSuccess: () => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ["imports"] });
+    },
+  });
+}
+
+export function useImportHistory() {
+  return useQuery({
+    queryKey: ["imports"],
+    queryFn: () => api.get<Page<ImportBatch>>(`/imports${query({ page_size: 10 })}`),
+  });
+}
+
+export function useUndoImport() {
+  const invalidate = useInvalidateOnEntryChange();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete<void>(`/imports/${id}`),
+    onSuccess: () => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ["imports"] });
+    },
   });
 }

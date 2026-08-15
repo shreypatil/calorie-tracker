@@ -74,10 +74,14 @@ async function readProblem(response: Response): Promise<ProblemDetail | null> {
 }
 
 async function rawRequest(path: string, init: RequestInit, token: string | null) {
+  // FormData must set its own Content-Type — the browser adds the multipart
+  // boundary, and overriding it produces an unparseable request body.
+  const isFormData = init.body instanceof FormData;
+
   return fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
-      ...(init.body ? { "Content-Type": "application/json" } : {}),
+      ...(init.body && !isFormData ? { "Content-Type": "application/json" } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init.headers,
     },
@@ -149,6 +153,11 @@ export const api = {
   patch: <T>(path: string, body: unknown) =>
     request<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
+  upload: <T>(path: string, file: File, field = "file") => {
+    const form = new FormData();
+    form.append(field, file);
+    return request<T>(path, { method: "POST", body: form });
+  },
 };
 
 /** Builds a query string, dropping empty values so URLs stay clean. */

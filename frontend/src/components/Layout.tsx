@@ -10,6 +10,7 @@ const NAV = [
   { to: "/entries", label: "Entries" },
   { to: "/reports", label: "Reports" },
   { to: "/goals", label: "Goals" },
+  { to: "/import", label: "Import" },
 ];
 
 export function Layout() {

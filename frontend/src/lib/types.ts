@@ -161,3 +161,72 @@ export interface GoalVsActual {
   date_to: string;
   points: GoalComparisonPoint[];
 }
+
+// --- Import (FR-8) --------------------------------------------------------
+
+export type DateFormat = "DMY" | "MDY" | "YMD" | "ISO";
+export type NutritionBasis = "per_serving" | "per_100g";
+export type RowStatus = "ok" | "needs_review" | "invalid";
+export type SourceKind = "table" | "prose";
+
+export const DATE_FORMAT_LABELS: Record<DateFormat, string> = {
+  DMY: "Day first (31/12/2026)",
+  MDY: "Month first (12/31/2026)",
+  YMD: "Year first (2026/12/31)",
+  ISO: "ISO (2026-12-31)",
+};
+
+export interface ColumnMapping {
+  source: string;
+  target: string;
+  confidence: number;
+}
+
+export interface TableMapping {
+  columns: ColumnMapping[];
+  date_format: DateFormat;
+  basis: NutritionBasis;
+  quantity_column: string | null;
+  default_meal_type: MealType | null;
+  header_row_index: number;
+  notes: string;
+}
+
+export interface RowIssue {
+  field: string | null;
+  message: string;
+}
+
+export interface DraftRow {
+  index: number;
+  status: RowStatus;
+  issues: RowIssue[];
+  entry: FoodEntry | null;
+  raw: Record<string, string>;
+  duplicate_of: string | null;
+}
+
+export interface ImportSummary {
+  filename: string;
+  page_count: number;
+  row_count: number;
+  ready: number;
+  needs_review: number;
+  invalid: number;
+  duplicates: number;
+}
+
+export interface PdfImportPreview {
+  summary: ImportSummary;
+  mapping: TableMapping;
+  source_kind: SourceKind;
+  rows: DraftRow[];
+}
+
+export interface ImportBatch {
+  id: string;
+  filename: string;
+  row_count: number;
+  created_at: string;
+  entries_remaining: number;
+}

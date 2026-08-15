@@ -4,6 +4,7 @@ import { useAuth } from "./lib/auth";
 import { Dashboard } from "./pages/Dashboard";
 import { Entries } from "./pages/Entries";
 import { Goals } from "./pages/Goals";
+import { Import } from "./pages/Import";
 import { Reports } from "./pages/Reports";
 import { SignIn } from "./pages/SignIn";
 import { Register } from "./pages/Register";
@@ -62,6 +63,7 @@ export default function App() {
         <Route path="/entries" element={<Entries />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/goals" element={<Goals />} />
+        <Route path="/import" element={<Import />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

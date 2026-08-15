@@ -38,6 +38,7 @@ for (const [name, path] of [
   ["03-entries", "/entries"],
   ["04-reports", "/reports"],
   ["05-goals", "/goals"],
+  ["06-import", "/import"],
 ]) {
   await page.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
   await page.waitForTimeout(600);
