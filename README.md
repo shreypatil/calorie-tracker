@@ -37,15 +37,16 @@ Then open <http://localhost:5173> and sign in as `demo@example.com` / `demo-pass
 `make help` lists every target. `make api` and `make web` run the two halves separately, `make test`
 and `make lint` check it, and `make reset` rebuilds the database from scratch.
 
-### No API key required
+### Setting up the AI features
 
-The app runs fully without any credentials. AI features sit behind a provider interface whose default
-implementation is a deterministic stub, so you can exercise every feature — including PDF import,
-chat and photo scanning — on a fresh clone with no account, no key, and no network.
+**The AI features need an API key.** Photo scanning, the chat assistant, nutrition estimation and
+the smarter half of PDF import all call a real model, so set `AI_API_KEY` in `backend/.env` before
+using them. Without a key the app still starts and every non-AI feature works, but the AI endpoints
+fall back to a built-in stub that returns fixed placeholder data — it exists so the test suite can
+run offline, not as a substitute for the real thing.
 
-To use real inference instead, set `AI_API_KEY` in `backend/.env`. One adapter serves every provider,
-because OpenAI, Google Gemini, Groq and a locally-run Ollama all expose an OpenAI-compatible
-endpoint, so switching is two lines:
+One adapter serves every provider, because OpenAI, Google Gemini, Groq and a locally-run Ollama all
+expose an OpenAI-compatible endpoint, so switching is two lines:
 
 | Provider | Free? | `.env` |
 |---|---|---|
@@ -56,9 +57,9 @@ endpoint, so switching is two lines:
 
 `backend/.env.example` carries all four ready to uncomment. Two things to know: in Docker the key
 comes from Compose rather than `backend/.env` (which is deliberately not copied into the image), and
-`AI_PROVIDER=auto` silently falls back to the stub when no key is present — so set
-`AI_PROVIDER=openai_compatible` explicitly if you want a missing key to be an error rather than
-canned answers.
+the default `AI_PROVIDER=auto` falls back to the stub *silently* when no key is present. Set
+`AI_PROVIDER=openai_compatible` explicitly so a missing key is an error rather than placeholder
+output you might mistake for a real result.
 
 ### In-app documentation
 
@@ -194,10 +195,13 @@ make test    # 263 backend tests, plus the frontend type check and build
 make lint
 ```
 
-Each test gets its own temporary SQLite file, so tests are order-independent, and everything runs
-against the stub provider — no key, no network, no quota. Coverage spans auth flows including
-refresh-token rotation and replay, per-resource user isolation, input validation, the pagination
-contract, and error-envelope consistency.
+Each test gets its own temporary SQLite file, so tests are order-independent, and the AI provider is
+forced to the stub so the suite needs no key, network or quota. That means the tests cover the
+plumbing around the model — parsing, scaling, verification, tool dispatch, the confirm gate — and
+say nothing about how well a real model reads a document; that was checked by hand instead (see
+[Status](#status)). Coverage spans auth flows including refresh-token rotation and replay,
+per-resource user isolation, input validation, the pagination contract, and error-envelope
+consistency.
 
 Beyond the happy paths, the suite pins the properties that would otherwise become quiet bugs: that a
 preview writes nothing, that a fabricated number absent from the source is discarded rather than
