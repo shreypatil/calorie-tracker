@@ -7,9 +7,13 @@ services:
       DATABASE_URL: sqlite:////srv/data/calorie_tracker.db
       JWT_SECRET: dev-only-insecure-secret-change-me
       AI_PROVIDER: auto
+      # Logs go to the named volume as well as stdout, so `docker compose logs` and the durable
+      # file agree and neither is the only copy.
+      LOG_DIR: /srv/logs
     volumes:
-      # Named volume so the database survives rebuilds.
+      # Named volumes so the database and the logs survive rebuilds.
       - api-data:/srv/data
+      - api-logs:/srv/logs
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s
@@ -27,3 +31,4 @@ services:
 
 volumes:
   api-data:
+  api-logs:

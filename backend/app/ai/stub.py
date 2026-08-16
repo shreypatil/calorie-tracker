@@ -15,6 +15,7 @@ import re
 # Imported by module path, not `from app.ai import ...`: this module is itself imported
 # while `app.ai` is still initializing, and the package attribute does not exist yet.
 from app.ai.stub_chat import converse as converse_stub
+from app.ai.stub_chat import estimate_nutrition as estimate_nutrition_stub
 from app.db.models import MealType
 from app.schemas.chat import AssistantTurn, ProviderMessage, ToolSpec
 from app.schemas.import_ import (
@@ -25,6 +26,7 @@ from app.schemas.import_ import (
     TableMapping,
     TableSample,
 )
+from app.schemas.nutrition import NutritionEstimate, NutritionEstimateRequest
 from app.schemas.photo import PhotoExtraction, PhotoKind, RawFoodItem
 
 #: Header keywords → entry field, most specific first. Order matters: "sugar"
@@ -184,6 +186,10 @@ class StubProvider:
     def converse(self, messages: list[ProviderMessage], tools: list[ToolSpec]) -> AssistantTurn:
         """Regex intent matching — see `stub_chat` for the phrasings it understands."""
         return converse_stub(messages, tools)
+
+    def estimate_nutrition(self, request: NutritionEstimateRequest) -> NutritionEstimate:
+        """Keyword lookup against a small food table — see `stub_chat.estimate_nutrition`."""
+        return estimate_nutrition_stub(request)
 
     def analyze_image(self, image, kind: PhotoKind) -> PhotoExtraction:
         """A fixed draft — the stub cannot see, so it stands in for what a model would say.

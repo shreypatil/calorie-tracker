@@ -13,6 +13,7 @@ from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import NotFoundError, ValidationError
+from app.core.logging import logger, operation
 from app.core.pagination import PageParams, paginate
 from app.db.models import EntrySource, FoodEntry, ImportBatch, MealType
 from app.schemas.entry import EntryCreate, EntryUpdate
@@ -76,11 +77,17 @@ def create_entry(
     *,
     source_ref: uuid.UUID | None = None,
 ) -> FoodEntry:
-    entry = FoodEntry(**payload.model_dump(), user_id=user_id, source_ref=source_ref)
-    session.add(entry)
-    session.commit()
-    session.refresh(entry)
-    return entry
+    with operation(
+        "entries.create",
+        user_id=str(user_id),
+        source=str(payload.source),
+        entry=payload.model_dump(),
+    ):
+        entry = FoodEntry(**payload.model_dump(), user_id=user_id, source_ref=source_ref)
+        session.add(entry)
+        session.commit()
+        session.refresh(entry)
+        return entry
 
 
 def create_entries_bulk(
@@ -96,6 +103,15 @@ def create_entries_bulk(
     When `import_filename` is given, the rows are tied to a single
     `ImportBatch` so the whole import can be undone later.
     """
+    logger.info(
+        "entries.bulk.started",
+        extra={
+            "user_id": str(user_id),
+            "count": len(payloads),
+            "source": str(source) if source else None,
+            "import_filename": import_filename,
+        },
+    )
     batch: ImportBatch | None = None
     if import_filename:
         batch = ImportBatch(user_id=user_id, filename=import_filename, row_count=len(payloads))
@@ -119,6 +135,14 @@ def create_entries_bulk(
 def update_entry(
     session: Session, user_id: uuid.UUID, entry_id: uuid.UUID, payload: EntryUpdate
 ) -> FoodEntry:
+    logger.info(
+        "entries.update",
+        extra={
+            "user_id": str(user_id),
+            "entry_id": str(entry_id),
+            "changes": payload.model_dump(exclude_unset=True),
+        },
+    )
     entry = get_entry(session, user_id, entry_id)
 
     for field, value in payload.model_dump(exclude_unset=True).items():
@@ -133,6 +157,7 @@ def update_entry(
 
 
 def delete_entry(session: Session, user_id: uuid.UUID, entry_id: uuid.UUID) -> None:
+    logger.info("entries.delete", extra={"user_id": str(user_id), "entry_id": str(entry_id)})
     entry = get_entry(session, user_id, entry_id)
     session.delete(entry)
     session.commit()

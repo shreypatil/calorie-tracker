@@ -26,7 +26,7 @@ from pydantic import BaseModel, ValidationError
 
 from app.core.config import Settings
 from app.core.errors import AppError, ExternalServiceError, UpstreamRateLimitError
-from app.core.logging import logger
+from app.core.logging import LogEvent, logger, operation
 from app.schemas.chat import AssistantTurn, ProviderMessage, ToolCall, ToolSpec
 from app.schemas.import_ import (
     MAPPABLE_FIELDS,
@@ -35,6 +35,7 @@ from app.schemas.import_ import (
     TableMapping,
     TableSample,
 )
+from app.schemas.nutrition import NutritionEstimate, NutritionEstimateRequest
 from app.schemas.photo import PhotoExtraction, PhotoKind
 
 MAPPING_SYSTEM_PROMPT = f"""\
@@ -93,6 +94,24 @@ Use grams for `quantity` and "g" for `unit` where the food is naturally weighed.
 `transcript` empty — there is nothing to transcribe.\
 """
 
+ESTIMATE_SYSTEM_PROMPT = """\
+You estimate the nutritional content of a described dish.
+
+You are given a food name, sometimes a portion, and sometimes figures the user already knows. \
+Return only the fields you are asked for.
+
+Rules:
+- Values the user supplied are FIXED. Do not return them, do not contradict them, and scale \
+everything else so it is consistent with them. If they say the dish is 300 kcal, the macros you \
+return should be macros for a 300 kcal portion of it.
+- Scale to the portion given. A quantity in grams is a weight, not a number of servings. With no \
+portion stated, assume one ordinary serving and say so in `notes`.
+- These are estimates and are shown to the user as estimates, so give your best reasoned figure \
+rather than refusing. Do not return a field you were not asked for.
+- Set `confidence` below 0.4 when the description is too vague to place — "curry" or "soup" with \
+no other detail — and say what would narrow it down in `notes`.\
+"""
+
 PROSE_SYSTEM_PROMPT = """\
 You extract food-diary entries from free-form text.
 
@@ -123,6 +142,7 @@ class OpenAICompatibleProvider:
         key = settings.ai_api_key.get_secret_value() if settings.ai_api_key else "not-needed"
 
         self._model = settings.ai_model
+        self._base_url = settings.ai_base_url
         self._client = OpenAI(
             api_key=key,
             base_url=settings.ai_base_url,
@@ -134,19 +154,46 @@ class OpenAICompatibleProvider:
 
     def infer_table_mapping(self, sample: TableSample) -> TableMapping:
         document = _render_table(sample)
-        return self._structured(
-            system=MAPPING_SYSTEM_PROMPT,
-            user=f"<document>\n{document}\n</document>\n\nDescribe this table's layout.",
-            schema=TableMapping,
-        )
+        with self._call("infer_table_mapping", columns=len(sample.headers), rows=len(sample.rows)):
+            return self._structured(
+                system=MAPPING_SYSTEM_PROMPT,
+                user=f"<document>\n{document}\n</document>\n\nDescribe this table's layout.",
+                schema=TableMapping,
+            )
 
     def extract_entries_from_text(self, chunk: str) -> list[RawEntry]:
-        result = self._structured(
-            system=PROSE_SYSTEM_PROMPT,
-            user=f"<document>\n{chunk}\n</document>\n\nExtract every food entry.",
-            schema=ProseExtraction,
-        )
+        with self._call("extract_entries_from_text", chars=len(chunk)):
+            result = self._structured(
+                system=PROSE_SYSTEM_PROMPT,
+                user=f"<document>\n{chunk}\n</document>\n\nExtract every food entry.",
+                schema=ProseExtraction,
+            )
         return result.entries
+
+    def estimate_nutrition(self, request: NutritionEstimateRequest) -> NutritionEstimate:
+        """One structured call. No document to check against — this is judgement, not reading."""
+        portion = (
+            f"{request.quantity:g} {request.unit or 'serving'}"
+            if request.quantity
+            else "one ordinary serving"
+        )
+        known = (
+            "\n".join(f"- {field}: {value:g}" for field, value in request.known.items())
+            or "- (none)"
+        )
+        with self._call(
+            "estimate_nutrition", fields=len(request.fields), anchors=len(request.known)
+        ):
+            return self._structured(
+                system=ESTIMATE_SYSTEM_PROMPT,
+                user=(
+                    f"Food: {request.food_name}\n"
+                    f"Portion: {portion}\n"
+                    f"Already known (fixed, do not return these):\n{known}\n\n"
+                    f"Estimate exactly these fields: {', '.join(request.fields)}."
+                ),
+                schema=NutritionEstimate,
+            )
 
     def converse(self, messages: list[ProviderMessage], tools: list[ToolSpec]) -> AssistantTurn:
         """One chat turn, with tools offered.
@@ -154,38 +201,63 @@ class OpenAICompatibleProvider:
         Temperature is low but not zero: this is prose for a person, and a deterministic
         setting makes the assistant repeat itself verbatim across a conversation.
         """
-        try:
-            completion = self._client.chat.completions.create(
-                model=self._model,
-                messages=[_to_wire(message) for message in messages],  # type: ignore[arg-type]
-                tools=[_tool_to_wire(tool) for tool in tools],  # type: ignore[arg-type]
-                tool_choice="auto",
-                temperature=0.2,
-            )
-        except Exception as exc:
-            raise self._wrap(exc) from exc
+        with self._call("converse", messages=len(messages), tools=len(tools)):
+            try:
+                completion = self._client.chat.completions.create(
+                    model=self._model,
+                    messages=[_to_wire(message) for message in messages],  # type: ignore[arg-type]
+                    tools=[_tool_to_wire(tool) for tool in tools],  # type: ignore[arg-type]
+                    tool_choice="auto",
+                    temperature=0.2,
+                )
+            except Exception as exc:
+                raise self._wrap(exc) from exc
 
         choice = completion.choices[0].message
-        return AssistantTurn(
+        turn = AssistantTurn(
             content=choice.content or "",
             tool_calls=[_call_from_wire(call) for call in (choice.tool_calls or [])],
         )
+        # What the model actually asked for. When it gets a tool-call shape wrong this is the
+        # only place the raw arguments exist before validation rejects them.
+        logger.debug(
+            "ai.converse.result",
+            extra={
+                "event": LogEvent.UPSTREAM_RESPONSE,
+                "content_chars": len(turn.content),
+                "tool_calls": [
+                    {"name": call.name, "arguments": call.arguments} for call in turn.tool_calls
+                ],
+                "usage": _usage(completion),
+            },
+        )
+        return turn
 
     def analyze_image(self, image, kind: PhotoKind) -> PhotoExtraction:
         """One vision call. The image is inlined, never uploaded anywhere persistent."""
         label = kind is PhotoKind.LABEL
-        return self._structured(
-            system=LABEL_SYSTEM_PROMPT if label else MEAL_SYSTEM_PROMPT,
-            user=(
-                "Transcribe this nutrition label, then report its values."
-                if label
-                else "Identify each food here and estimate its portion and nutrition."
-            ),
-            schema=PhotoExtraction,
-            image_url=image.data_url,
-        )
+        # The byte count, never the bytes: a data URL is over a megabyte of base64.
+        with self._call("analyze_image", kind=str(kind), image_bytes=len(image.data)):
+            return self._structured(
+                system=LABEL_SYSTEM_PROMPT if label else MEAL_SYSTEM_PROMPT,
+                user=(
+                    "Transcribe this nutrition label, then report its values."
+                    if label
+                    else "Identify each food here and estimate its portion and nutrition."
+                ),
+                schema=PhotoExtraction,
+                image_url=image.data_url,
+            )
 
     # -- transport --------------------------------------------------------
+
+    def _call(self, method: str, **context):
+        """Bracket one upstream call with a log line either side.
+
+        The model name and base URL go on every one, because "the AI failed" is unactionable
+        without knowing which provider and which model were being asked.
+        """
+        return operation(f"ai.{method}", model=self._model, base_url=self._base_url, **context)
 
     def _structured[T: BaseModel](
         self, *, system: str, user: str, schema: type[T], image_url: str | None = None
@@ -277,8 +349,6 @@ class OpenAICompatibleProvider:
         rather than only in the log — but a quota is its own case, because
         nothing is broken and waiting actually fixes it.
         """
-        logger.warning("ai_request_failed", extra={"error": str(exc)})
-
         if _is_quota_error(exc):
             retry = _retry_hint(exc)
             return UpstreamRateLimitError(
@@ -438,3 +508,14 @@ def _render_table(sample: TableSample) -> str:
     lines.append("-" * 40)
     lines.extend(" | ".join(cell or "" for cell in row) for row in sample.rows)
     return "\n".join(lines)
+
+
+def _usage(completion) -> dict | None:
+    """Token counts, when the provider reports them. Not every OpenAI-compatible endpoint does."""
+    usage = getattr(completion, "usage", None)
+    if usage is None:
+        return None
+    return {
+        "prompt_tokens": getattr(usage, "prompt_tokens", None),
+        "completion_tokens": getattr(usage, "completion_tokens", None),
+    }

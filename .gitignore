@@ -14,6 +14,10 @@ htmlcov/
 .env
 .env.local
 
+# Logs
+backend/logs/
+*.log
+
 # Database
 *.db
 *.db-wal
@@ -36,3 +40,5 @@ CLAUDE.md
 
 # Dev notes and docs
 keys_human_readable.md
+comments.md
+TODO.md

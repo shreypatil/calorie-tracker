@@ -31,7 +31,7 @@ from sqlalchemy.orm import Session
 
 from app.ai.provider import AIProvider
 from app.core.errors import AppError, ConflictError, NotFoundError
-from app.core.logging import logger
+from app.core.logging import logger, operation
 from app.core.pagination import PageParams, paginate
 from app.db.base import utcnow
 from app.db.models import ChatMessage, ChatRole
@@ -195,9 +195,21 @@ def _run_read_tool(session: Session, user_id: uuid.UUID, call: ToolCall) -> tupl
     try:
         tool = resolve(call.name)
         args = validate_args(tool, call.arguments)
-        return call.name, tool.handler(session, user_id, args)
+        with operation("chat.read_tool", tool=call.name, arguments=call.arguments):
+            return call.name, tool.handler(session, user_id, args)
     except AppError as exc:
-        logger.info("chat_tool_rejected", extra={"tool": call.name, "error": exc.detail})
+        # Swallowed on purpose — the model can fix this itself on the next iteration. But a
+        # swallowed error reaches no exception handler, so if it is not logged here it is not
+        # logged anywhere. The arguments and field errors are what make it diagnosable.
+        logger.warning(
+            "chat_tool_rejected",
+            extra={
+                "tool": call.name,
+                "arguments": call.arguments,
+                "error": exc.detail,
+                "errors": exc.errors or None,
+            },
+        )
         return call.name, {"error": exc.detail, "errors": exc.errors}
 
 
@@ -210,6 +222,8 @@ def send_message(
         *_history(session, user_id),
         ProviderMessage(role="user", content=text),
     ]
+
+    logger.debug("chat.turn.message", extra={"text": text, "history": len(conversation) - 2})
 
     rows = [ChatMessage(user_id=user_id, role=ChatRole.USER, content=text)]
     specs = tool_specs()
@@ -287,7 +301,19 @@ def _propose(calls: list[ToolCall]) -> list[PendingAction]:
         try:
             args = validate_args(tool, call.arguments)
         except AppError as exc:
-            logger.info("chat_write_rejected", extra={"tool": call.name, "error": exc.detail})
+            # This is the line whose absence made the "prawns curry" failure undiagnosable: the
+            # model returned a wrong-shaped `log_meal` call, this branch swallowed it into a
+            # discarded action, and only `exc.detail` — "Invalid arguments for log_meal." — was
+            # kept. The arguments and the per-field errors are the entire story.
+            logger.warning(
+                "chat_write_rejected",
+                extra={
+                    "tool": call.name,
+                    "arguments": call.arguments,
+                    "error": exc.detail,
+                    "errors": exc.errors or None,
+                },
+            )
             actions.append(
                 PendingAction(
                     id=uuid.uuid4().hex,
@@ -355,8 +381,12 @@ def confirm_action(
     tool = resolve(action["tool"])
     # Re-validated even when unedited: the draft may have been sitting for a while, and the
     # argument model is the only thing standing between the model's output and a service.
-    args = validate_args(tool, arguments if arguments is not None else action["arguments"])
-    result = tool.handler(session, user_id, args)
+    supplied = arguments if arguments is not None else action["arguments"]
+    with operation(
+        "chat.confirm_action", tool=action["tool"], action_id=action_id, arguments=supplied
+    ):
+        args = validate_args(tool, supplied)
+        result = tool.handler(session, user_id, args)
 
     return _settle(
         session,

@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.errors import ConflictError, UnauthorizedError
+from app.core.logging import logger
 from app.core.security import (
     create_access_token,
     generate_refresh_token,
@@ -27,6 +28,9 @@ from app.schemas.auth import TokenPair
 
 
 def register_user(session: Session, *, email: str, password: str, display_name: str) -> User:
+    # The email identifies the attempt; the password is never logged, and the scrubber would
+    # redact it even if a careless caller passed it through.
+    logger.info("auth.register", extra={"email": email})
     user = User(email=email, password_hash=hash_password(password), display_name=display_name)
     session.add(user)
     try:
@@ -45,7 +49,14 @@ def authenticate_user(session: Session, *, email: str, password: str) -> User:
     # which email addresses are registered.
     password_hash = user.password_hash if user else hash_password("dummy-password")
     if not verify_password(password, password_hash) or user is None:
+        # Distinguishing "no such account" from "wrong password" in the log is fine — the log is
+        # ours. The *response* stays identical, which is what protects account enumeration.
+        logger.warning(
+            "auth.login.failed",
+            extra={"email": email, "reason": "no_such_user" if user is None else "bad_password"},
+        )
         raise UnauthorizedError("Email or password is incorrect.")
+    logger.info("auth.login.ok", extra={"email": email, "user_id": str(user.id)})
     return user
 
 

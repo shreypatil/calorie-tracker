@@ -26,6 +26,16 @@ class Settings(BaseSettings):
 
     cors_origins: list[str] = ["http://localhost:5173"]
 
+    # Logging. The file is the durable record — stdout dies with the terminal, which is exactly
+    # how a production-shaped bug once became undiagnosable. DEBUG additionally logs the payloads
+    # being processed; INFO keeps the request spine only.
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+    log_to_file: bool = True
+    log_dir: str = "./logs"
+    log_filename: str = "app.log"
+    log_max_bytes: int = 10 * 1024 * 1024
+    log_backup_count: int = 5
+
     default_page_size: int = 25
     max_page_size: int = 100
 

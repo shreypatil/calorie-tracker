@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from app.schemas.chat import AssistantTurn, ProviderMessage, ToolSpec
 from app.schemas.import_ import RawEntry, TableMapping, TableSample
+from app.schemas.nutrition import NutritionEstimate, NutritionEstimateRequest
 from app.schemas.photo import PhotoExtraction, PhotoKind
 
 if TYPE_CHECKING:  # avoids a cycle: the photo service imports this module
@@ -49,5 +50,15 @@ class AIProvider(Protocol):
 
         For a label the result must include the panel transcribed verbatim: the caller checks
         every reported figure against it and discards any that was not actually written there.
+        """
+        ...
+
+    def estimate_nutrition(self, request: NutritionEstimateRequest) -> NutritionEstimate:
+        """Estimate the nutrition of a described dish.
+
+        Unlike every other method here there is no source document to check the answer against —
+        this is judgement, not transcription. What keeps it honest is that the caller asked for
+        specific fields and gets only those back, and that a person sees every figure in a form
+        before anything is saved.
         """
         ...

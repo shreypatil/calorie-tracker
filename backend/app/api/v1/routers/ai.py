@@ -1,9 +1,11 @@
-"""AI photo extraction endpoints (FR-5).
+"""AI-assisted entry endpoints.
 
-`POST /ai/analyze-image` reads a photo and returns draft rows. **It writes nothing.** The image
-is held in memory for the length of the call and discarded; committing the result goes through
-the same `POST /entries` and `POST /entries/bulk` that manual entry uses, so extracted rows
-travel the same validation path as anything typed by hand.
+`POST /ai/analyze-image` reads a photo and returns draft rows (FR-5). `POST /ai/estimate-nutrition`
+estimates the nutrition of a dish the user described in words.
+
+**Neither writes anything.** Both return values for a person to review, and committing goes through
+the same `POST /entries` and `POST /entries/bulk` that manual entry uses, so assisted rows travel
+the same validation path as anything typed by hand.
 """
 
 from datetime import date
@@ -17,7 +19,9 @@ from app.core.config import get_settings
 from app.core.deps import CurrentUser, DbSession
 from app.core.errors import ValidationError
 from app.db.models import MealType
+from app.schemas.nutrition import NutritionEstimate, NutritionEstimateRequest
 from app.schemas.photo import PhotoDraft, PhotoKind
+from app.services import nutrition_estimate
 from app.services import photo as photo_service
 from app.services.rate_limit import limiter
 
@@ -64,3 +68,20 @@ async def analyze_image(
         provider=get_provider(),
         max_bytes=settings.max_upload_bytes,
     )
+
+
+@router.post("/estimate-nutrition", response_model=NutritionEstimate)
+@limiter.limit("20/minute")
+async def estimate_nutrition(
+    request: Request,
+    payload: NutritionEstimateRequest,
+    current_user: CurrentUser,
+) -> NutritionEstimate:
+    """Estimate the nutrition of a described dish. **Nothing is saved by this call.**
+
+    Only the fields named in `fields` come back, and never one the caller listed in `known` — so
+    values the user already entered cannot be replaced by the response.
+    """
+    # Off the event loop, like the image route: the provider call is blocking network I/O that
+    # would otherwise stall every other request in the process.
+    return await run_in_threadpool(nutrition_estimate.estimate, payload, get_provider())

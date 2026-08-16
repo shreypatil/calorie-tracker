@@ -19,25 +19,47 @@ confirms them before anything is written.
 import json
 import re
 from datetime import date, timedelta
+from typing import NamedTuple
 
 from app.schemas.chat import AssistantTurn, ProviderMessage, ToolCall
+from app.schemas.nutrition import NutritionEstimate, NutritionEstimateRequest
 
-#: food keyword → (kcal, protein g, carbs g, fat g) for one serving.
-STUB_FOODS: dict[str, tuple[float, float, float, float]] = {
-    "egg": (78, 6.3, 0.6, 5.3),
-    "toast": (75, 2.6, 13.0, 1.0),
-    "bread": (75, 2.6, 13.0, 1.0),
-    "rice": (206, 4.3, 44.5, 0.4),
-    "chicken": (231, 43.4, 0.0, 5.0),
-    "salad": (33, 2.0, 6.0, 0.3),
-    "apple": (95, 0.5, 25.0, 0.3),
-    "banana": (105, 1.3, 27.0, 0.4),
-    "coffee": (2, 0.3, 0.0, 0.0),
-    "milk": (103, 8.0, 12.0, 2.4),
-    "oats": (154, 5.3, 27.4, 2.6),
-    "yogurt": (149, 8.5, 11.4, 8.0),
-    "pasta": (221, 8.1, 43.2, 1.3),
-    "sandwich": (350, 15.0, 40.0, 14.0),
+
+class StubNutrition(NamedTuple):
+    """One serving of a food the stub happens to know about.
+
+    Named rather than a bare tuple because it grew from four fields to seven when nutrition
+    estimation needed fibre, sugar and sodium, and positional unpacking of seven numbers is how
+    silent transposition bugs happen.
+    """
+
+    calories: float
+    protein_g: float
+    carbs_g: float
+    fat_g: float
+    fiber_g: float
+    sugar_g: float
+    sodium_mg: float
+
+
+#: Ordinary reference values for one common serving. The stub cannot look anything up, so this is
+#: what stands in for a model's knowledge — small, deterministic, and enough to exercise every
+#: downstream path with no API key.
+STUB_FOODS: dict[str, StubNutrition] = {
+    "egg": StubNutrition(78, 6.3, 0.6, 5.3, 0.0, 0.6, 62),
+    "toast": StubNutrition(75, 2.6, 13.0, 1.0, 1.1, 1.4, 144),
+    "bread": StubNutrition(75, 2.6, 13.0, 1.0, 1.1, 1.4, 144),
+    "rice": StubNutrition(206, 4.3, 44.5, 0.4, 0.6, 0.1, 2),
+    "chicken": StubNutrition(231, 43.4, 0.0, 5.0, 0.0, 0.0, 104),
+    "salad": StubNutrition(33, 2.0, 6.0, 0.3, 2.2, 2.4, 27),
+    "apple": StubNutrition(95, 0.5, 25.0, 0.3, 4.4, 19.0, 2),
+    "banana": StubNutrition(105, 1.3, 27.0, 0.4, 3.1, 14.4, 1),
+    "coffee": StubNutrition(2, 0.3, 0.0, 0.0, 0.0, 0.0, 5),
+    "milk": StubNutrition(103, 8.0, 12.0, 2.4, 0.0, 12.0, 107),
+    "oats": StubNutrition(154, 5.3, 27.4, 2.6, 4.0, 0.6, 9),
+    "yogurt": StubNutrition(149, 8.5, 11.4, 8.0, 0.0, 11.4, 113),
+    "pasta": StubNutrition(221, 8.1, 43.2, 1.3, 2.5, 0.8, 1),
+    "sandwich": StubNutrition(350, 15.0, 40.0, 14.0, 3.0, 5.0, 700),
 }
 
 MEAL_WORDS = ("breakfast", "lunch", "dinner", "snack")
@@ -88,14 +110,14 @@ def _split_items(text: str) -> list[str]:
     return [part.strip(" .!?\t") for part in parts if part.strip(" .!?\t")]
 
 
-def _nutrition(name: str) -> tuple[float, float, float, float]:
+def _nutrition(name: str) -> StubNutrition:
     lowered = name.lower()
     for keyword, values in STUB_FOODS.items():
         if keyword in lowered:
             return values
     # Unknown food: zeros, so the draft card shows the gap and the user fills it in rather
     # than a fabricated number slipping through unnoticed.
-    return (0.0, 0.0, 0.0, 0.0)
+    return StubNutrition(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
 
 def _meal_items(text: str) -> list[dict]:
@@ -112,17 +134,17 @@ def _meal_items(text: str) -> list[dict]:
         if not part:
             continue
 
-        calories, protein, carbs, fat = _nutrition(part)
+        food = _nutrition(part)
         items.append(
             {
                 "food_name": part[:200],
                 "meal_type": meal,
                 "quantity": quantity,
                 "unit": "serving",
-                "calories": round(calories * quantity, 1),
-                "protein_g": round(protein * quantity, 1),
-                "carbs_g": round(carbs * quantity, 1),
-                "fat_g": round(fat * quantity, 1),
+                "calories": round(food.calories * quantity, 1),
+                "protein_g": round(food.protein_g * quantity, 1),
+                "carbs_g": round(food.carbs_g * quantity, 1),
+                "fat_g": round(food.fat_g * quantity, 1),
             }
         )
     return items
@@ -140,6 +162,44 @@ def _target_value(text: str, labels: tuple[str, ...]) -> float | None:
         if after:
             return float(after.group(1))
     return None
+
+
+def estimate_nutrition(request: NutritionEstimateRequest) -> NutritionEstimate:
+    """Deterministic stand-in for a model's nutritional knowledge.
+
+    Keyword-matches the food name against `STUB_FOODS` and scales by the stated quantity. It knows
+    fourteen foods and nothing else, which is the point: it is a stand-in, not a competitor. What it
+    must get right is the *shape* — only the requested fields, scaled sensibly — so the service,
+    the endpoint and the form are all exercised exactly as they would be with a real provider.
+    """
+    food = _nutrition(request.food_name)
+    known = set(request.known)
+
+    # A quantity in grams describes a weight, not a count of servings: 350 g of rice is three and a
+    # half of this table's servings, not three hundred and fifty of them.
+    quantity = request.quantity or 1.0
+    if (request.unit or "").strip().lower() in {"g", "gram", "grams"}:
+        factor = quantity / 100.0
+    else:
+        factor = quantity
+
+    values = {
+        field: round(getattr(food, field) * factor, 1)
+        for field in request.fields
+        # Anchors are never returned; the caller keeps whatever the user typed.
+        if field not in known
+    }
+
+    recognised = any(getattr(food, field) for field in food._fields)
+    return NutritionEstimate(
+        values=values,
+        notes=(
+            ""
+            if recognised
+            else "The offline estimator does not recognise this food, so the figures are zero."
+        ),
+        confidence=0.6 if recognised else 0.1,
+    )
 
 
 def _last_user_message(messages: list[ProviderMessage]) -> str:

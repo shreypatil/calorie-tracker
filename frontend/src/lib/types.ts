@@ -305,3 +305,36 @@ export interface AggregateResponse {
   metrics: string[];
   rows: Record<string, string | number>[];
 }
+
+// --- AI nutrition estimation ---------------------------------------------
+
+/** The seven fields the model will estimate. Mirrors ESTIMABLE_FIELDS on the server. */
+export const ESTIMABLE_FIELDS = [
+  "calories",
+  "protein_g",
+  "carbs_g",
+  "fat_g",
+  "fiber_g",
+  "sugar_g",
+  "sodium_mg",
+] as const;
+
+export type EstimableField = (typeof ESTIMABLE_FIELDS)[number];
+
+export interface NutritionEstimateRequest {
+  food_name: string;
+  quantity?: number | null;
+  unit?: string | null;
+  /** Values the user already entered. Sent as anchors; never returned. */
+  known: Partial<Record<EstimableField, number>>;
+  fields: EstimableField[];
+}
+
+export interface NutritionEstimate {
+  values: Partial<Record<EstimableField, number>>;
+  notes: string;
+  confidence: number;
+}
+
+/** Where a field's current value came from. Decides what an estimate may overwrite. */
+export type FieldSource = "user" | "photo" | "estimate";

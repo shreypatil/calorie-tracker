@@ -11,13 +11,16 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { ScanControl } from "../components/photo/ScanControl";
 import { Alert, Button, Card, CardHeader, Field, Input, Select } from "../components/ui";
-import { useCreateEntry } from "../lib/queries";
+import { useCreateEntry, useEstimateNutrition } from "../lib/queries";
 import { ApiError } from "../lib/api";
 import { MEAL_LABELS, nutrientLabel, nutrientUnit, today } from "../lib/format";
 import {
+  ESTIMABLE_FIELDS,
   MEAL_TYPES,
   MICRONUTRIENTS,
   type DraftRow,
+  type EstimableField,
+  type FieldSource,
   type MealType,
   type Micronutrient,
 } from "../lib/types";
@@ -65,6 +68,11 @@ const DEFAULTS = {
   ...Object.fromEntries(MICRONUTRIENTS.map((name) => [name, ""])),
 } as unknown as FormValues;
 
+/** Marks a field whose value a model produced, so a guess never passes for a measurement. */
+function estimatedLabel(base: string, estimated: boolean): string {
+  return estimated ? `${base}  \u2726 estimated` : base;
+}
+
 export function LogEntryForm({ onLogged }: { onLogged?: () => void }) {
   const create = useCreateEntry();
   const [showMicros, setShowMicros] = useState(false);
@@ -72,12 +80,29 @@ export function LogEntryForm({ onLogged }: { onLogged?: () => void }) {
 
   const [scanNote, setScanNote] = useState<string | null>(null);
 
+  const estimate = useEstimateNutrition();
+
+  /**
+   * Where each field's current value came from.
+   *
+   * Three things can now fill a field and an estimate may only touch some of them. `dirtyFields`
+   * alone is not enough: a photo scan fills the form through `reset()`, which *clears* dirty state,
+   * so scanned values would look untouched and get overwritten. Tracking the source explicitly is
+   * the only way to tell "the user left this alone" from "something already filled it".
+   */
+  const [source, setSource] = useState<Partial<Record<string, FieldSource>>>({});
+
+  /** Values as they were before the last estimate, so it can be undone. */
+  const [beforeEstimate, setBeforeEstimate] = useState<Record<string, unknown> | null>(null);
+
   const {
     register,
     handleSubmit,
     reset,
     control,
-    formState: { errors },
+    getValues,
+    setValue,
+    formState: { errors, dirtyFields },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: DEFAULTS,
@@ -87,6 +112,7 @@ export function LogEntryForm({ onLogged }: { onLogged?: () => void }) {
   // taken for yesterday's lunch does not silently land on today's breakfast.
   const consumedOn = useWatch({ control, name: "consumed_on" }) as string;
   const mealType = useWatch({ control, name: "meal_type" }) as MealType;
+  const foodName = useWatch({ control, name: "food_name" }) as string;
 
   /** One food read from a photo: fill the form rather than making the user retype it. */
   function applyScannedRow(row: DraftRow) {
@@ -116,7 +142,86 @@ export function LogEntryForm({ onLogged }: { onLogged?: () => void }) {
         ? row.issues.map((issue) => issue.message).join(" ")
         : "Filled in from the photo — check it before saving.",
     );
+    // Marked so a later estimate treats them as already filled rather than as untouched.
+    setSource(
+      Object.fromEntries(
+        ["calories", "protein_g", "carbs_g", "fat_g", ...MICRONUTRIENTS]
+          .filter((name) => (entry as unknown as Record<string, unknown>)[name] != null)
+          .map((name) => [name, "photo" as const]),
+      ),
+    );
+    setBeforeEstimate(null);
     setShowMicros(MICRONUTRIENTS.some((name) => entry[name] != null));
+  }
+
+  const estimatedCount = Object.values(source).filter((origin) => origin === "estimate").length;
+
+  /** A field may be estimated unless the user typed it or a photo filled it. */
+  function isEligible(field: EstimableField): boolean {
+    if (dirtyFields[field as keyof FormValues]) return false;
+    const origin = source[field];
+    // "estimate" is eligible so pressing the button again refreshes rather than freezing the
+    // first answer; anything else present was put there deliberately.
+    return origin === undefined || origin === "estimate";
+  }
+
+  async function runEstimate() {
+    const values = getValues();
+    const wanted = ESTIMABLE_FIELDS.filter(isEligible);
+    if (wanted.length === 0) return;
+
+    // Everything the user already provided travels as an anchor, so the estimate is scaled to
+    // their portion and their figures rather than to a generic serving.
+    const known: Partial<Record<EstimableField, number>> = {};
+    for (const field of ESTIMABLE_FIELDS) {
+      const raw = values[field as keyof FormValues];
+      if (!isEligible(field) && raw !== "" && raw != null) known[field] = Number(raw);
+    }
+
+    setServerError(null);
+    const previous: Record<string, unknown> = {};
+    for (const field of wanted) previous[field] = values[field as keyof FormValues];
+
+    try {
+      const result = await estimate.mutateAsync({
+        food_name: String(values.food_name ?? "").trim(),
+        quantity: values.quantity ? Number(values.quantity) : null,
+        unit: values.unit ? String(values.unit) : null,
+        known,
+        fields: wanted,
+      });
+
+      const filled = Object.entries(result.values) as [EstimableField, number][];
+      for (const [field, value] of filled) {
+        // shouldDirty stays false: an estimated value is not a user edit, so a second press
+        // can refresh it.
+        setValue(field as keyof FormValues, value as never, { shouldDirty: false });
+      }
+      setBeforeEstimate(previous);
+      setSource((current) => ({
+        ...current,
+        ...Object.fromEntries(filled.map(([field]) => [field, "estimate" as const])),
+      }));
+      if (filled.some(([field]) => MICRONUTRIENTS.includes(field as Micronutrient))) {
+        setShowMicros(true);
+      }
+      setScanNote(null);
+    } catch (error) {
+      setServerError(
+        error instanceof ApiError ? error.message : "Could not estimate that. Try again.",
+      );
+    }
+  }
+
+  function undoEstimate() {
+    if (!beforeEstimate) return;
+    for (const [field, value] of Object.entries(beforeEstimate)) {
+      setValue(field as keyof FormValues, value as never, { shouldDirty: false });
+    }
+    setSource((current) =>
+      Object.fromEntries(Object.entries(current).filter(([, origin]) => origin !== "estimate")),
+    );
+    setBeforeEstimate(null);
   }
 
   async function onSubmit(values: FormValues) {
@@ -132,6 +237,8 @@ export function LogEntryForm({ onLogged }: { onLogged?: () => void }) {
       reset({ ...DEFAULTS, consumed_on: values.consumed_on, meal_type: values.meal_type });
       setShowMicros(false);
       setScanNote(null);
+      setSource({});
+      setBeforeEstimate(null);
       onLogged?.();
     } catch (error) {
       setServerError(
@@ -168,6 +275,22 @@ export function LogEntryForm({ onLogged }: { onLogged?: () => void }) {
           </div>
         )}
 
+        {estimatedCount > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-3 rounded border border-rule bg-paper px-3 py-2">
+            <span className="text-[13px] text-ink-soft">
+              ✦ {estimatedCount} {estimatedCount === 1 ? "field" : "fields"} estimated by AI — check
+              them before saving.
+            </span>
+            <button
+              type="button"
+              className="text-[13px] text-accent underline"
+              onClick={undoEstimate}
+            >
+              Undo estimate
+            </button>
+          </div>
+        )}
+
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Date" error={errors.consumed_on?.message}>
             <Input type="date" max={today()} {...register("consumed_on")} />
@@ -182,7 +305,17 @@ export function LogEntryForm({ onLogged }: { onLogged?: () => void }) {
             </Select>
           </Field>
           <Field label="Food" error={errors.food_name?.message} className="sm:col-span-2">
-            <Input placeholder="Oatmeal with banana" {...register("food_name")} />
+            <div className="flex gap-2">
+              <Input placeholder="Oatmeal with banana" {...register("food_name")} />
+              <Button
+                type="button"
+                className="whitespace-nowrap"
+                disabled={estimate.isPending || !foodName?.trim()}
+                onClick={runEstimate}
+              >
+                {estimate.isPending ? "Estimating…" : "Estimate nutrition"}
+              </Button>
+            </div>
           </Field>
 
           <Field label="Quantity" error={errors.quantity?.message}>
@@ -191,16 +324,28 @@ export function LogEntryForm({ onLogged }: { onLogged?: () => void }) {
           <Field label="Unit" error={errors.unit?.message}>
             <Input placeholder="bowl" {...register("unit")} />
           </Field>
-          <Field label="Calories (kcal)" error={errors.calories?.message}>
+          <Field
+            label={estimatedLabel("Calories (kcal)", source.calories === "estimate")}
+            error={errors.calories?.message}
+          >
             <Input type="number" step="any" min="0" {...register("calories")} />
           </Field>
-          <Field label="Protein (g)" error={errors.protein_g?.message}>
+          <Field
+            label={estimatedLabel("Protein (g)", source.protein_g === "estimate")}
+            error={errors.protein_g?.message}
+          >
             <Input type="number" step="any" min="0" {...register("protein_g")} />
           </Field>
-          <Field label="Carbs (g)" error={errors.carbs_g?.message}>
+          <Field
+            label={estimatedLabel("Carbs (g)", source.carbs_g === "estimate")}
+            error={errors.carbs_g?.message}
+          >
             <Input type="number" step="any" min="0" {...register("carbs_g")} />
           </Field>
-          <Field label="Fat (g)" error={errors.fat_g?.message}>
+          <Field
+            label={estimatedLabel("Fat (g)", source.fat_g === "estimate")}
+            error={errors.fat_g?.message}
+          >
             <Input type="number" step="any" min="0" {...register("fat_g")} />
           </Field>
         </div>
@@ -220,7 +365,10 @@ export function LogEntryForm({ onLogged }: { onLogged?: () => void }) {
               {MICRONUTRIENTS.map((name) => (
                 <Field
                   key={name}
-                  label={`${nutrientLabel(name)} (${nutrientUnit(name)})`}
+                  label={estimatedLabel(
+                    `${nutrientLabel(name)} (${nutrientUnit(name)})`,
+                    source[name] === "estimate",
+                  )}
                   error={errors[name]?.message as string | undefined}
                 >
                   <Input type="number" step="any" min="0" placeholder="—" {...register(name)} />
@@ -237,6 +385,8 @@ export function LogEntryForm({ onLogged }: { onLogged?: () => void }) {
               reset(DEFAULTS);
               setShowMicros(false);
               setScanNote(null);
+              setSource({});
+              setBeforeEstimate(null);
             }}
           >
             Clear

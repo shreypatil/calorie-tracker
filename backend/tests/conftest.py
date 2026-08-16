@@ -21,6 +21,10 @@ os.environ.setdefault("JWT_SECRET", "test-secret-not-used-anywhere-real")
 # non-deterministic, and quietly billable. Tests must never leave the machine.
 os.environ["AI_PROVIDER"] = "stub"
 
+# Keep the suite out of the developer's real log file. Tests assert on log output by attaching
+# their own handler; a rotating file handler here would just scribble into logs/app.log.
+os.environ.setdefault("LOG_TO_FILE", "false")
+
 from app.core.config import get_settings  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.db.session import create_db_engine, get_db  # noqa: E402

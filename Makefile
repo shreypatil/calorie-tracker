@@ -1,4 +1,4 @@
-.PHONY: help install migrate migration seed dev api web test lint fmt reset docker-up docker-down
+.PHONY: help install migrate migration seed dev api web test lint fmt reset logs docker-up docker-down
 
 VENV := backend/.venv
 PY   := $(VENV)/bin/python
@@ -28,7 +28,7 @@ dev: migrate ## Run the API and the web app together (http://localhost:5173)
 	@echo "Web  → http://localhost:5173"
 	@trap 'kill 0' INT TERM; \
 	  (cd backend && .venv/bin/uvicorn app.main:app --reload --port 8000) & \
-	  (cd frontend && npm run dev) & \
+	  (cd frontend && npm run dev -- --host 0.0.0.0) & \
 	  wait
 
 api: migrate ## Run only the API, with auto-reload
@@ -36,6 +36,15 @@ api: migrate ## Run only the API, with auto-reload
 
 web: ## Run only the web app (expects the API on port 8000)
 	cd frontend && npm run dev
+
+logs: ## Follow the JSON log file, pretty-printed if jq is available
+	@mkdir -p backend/logs
+	@touch backend/logs/app.log
+	@if command -v jq >/dev/null 2>&1; then \
+		tail -f backend/logs/app.log | jq -c '{t: .timestamp[11:19], lvl: .level, req: .request_id[0:8], msg: .message} + (del(.timestamp, .level, .logger, .message, .request_id))'; \
+	else \
+		echo "(install jq for readable output)"; tail -f backend/logs/app.log; \
+	fi
 
 test: ## Run the backend test suite and the frontend type check
 	cd backend && .venv/bin/python -m pytest

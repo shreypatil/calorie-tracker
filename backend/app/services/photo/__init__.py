@@ -7,7 +7,7 @@ show the user. Nothing is written until they confirm, and the bytes are discarde
 from datetime import date
 
 from app.ai.provider import AIProvider
-from app.core.logging import logger
+from app.core.logging import logger, operation
 from app.db.models import MealType
 from app.schemas.photo import PhotoDraft, PhotoKind
 from app.services.photo.prepare import PreparedImage, prepare_image
@@ -26,13 +26,34 @@ def analyze_photo(
     max_bytes: int,
 ) -> PhotoDraft:
     """Read one uploaded photo into reviewable draft rows. **Persists nothing.**"""
-    image = prepare_image(content, content_type=content_type, max_bytes=max_bytes)
+    with operation(
+        "photo.prepare",
+        kind=str(kind),
+        filename=filename,
+        bytes=len(content),
+        content_type=content_type,
+    ):
+        image = prepare_image(content, content_type=content_type, max_bytes=max_bytes)
+
     logger.info(
         "photo_prepared",
         extra={"kind": str(kind), "width": image.width, "height": image.height},
     )
 
-    extraction = provider.analyze_image(image, kind)
+    with operation("photo.analyze", kind=str(kind), provider=getattr(provider, "name", "?")):
+        extraction = provider.analyze_image(image, kind)
+
+    logger.debug(
+        "photo.extraction",
+        extra={
+            "kind": str(extraction.kind),
+            "basis": str(extraction.basis),
+            "serving_size_g": extraction.serving_size_g,
+            "confidence": extraction.confidence,
+            "items": [item.model_dump() for item in extraction.items],
+            "transcript": extraction.transcript,
+        },
+    )
     # The provider is told which kind it is looking at, but the user's choice is what the
     # verification rules key off — a model that disagrees must not be able to talk its way
     # out of the transcript check.

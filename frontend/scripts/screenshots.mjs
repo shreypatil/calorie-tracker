@@ -52,6 +52,17 @@ await page.click("text=Log a meal");
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${OUT}/06-log-form.png`, fullPage: true });
 
+// AI nutrition estimation: a named dish fills only the untouched fields.
+await page.goto(`${BASE}/entries?log=1`, { waitUntil: "networkidle" });
+await page.waitForTimeout(500);
+await page.fill('input[name="food_name"]', "Chicken rice bowl");
+await page.fill('input[name="quantity"]', "350");
+await page.fill('input[name="unit"]', "g");
+await page.fill('input[name="calories"]', "600");
+await page.click('button:text-is("Estimate nutrition")');
+await page.waitForSelector("text=estimated by AI", { timeout: 20000 });
+await page.screenshot({ path: `${OUT}/11-estimate.png`, fullPage: true });
+
 // Photo extraction: a label fills the form, a plate produces an itemised draft.
 const FIXTURES = "../backend/tests/fixtures";
 

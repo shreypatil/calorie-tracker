@@ -13,6 +13,7 @@ from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import NotFoundError
+from app.core.logging import logger
 from app.core.pagination import PageParams, paginate
 from app.db.models import Goal, WeightLog
 from app.schemas.goal import GoalCreate, GoalUpdate, WeightLogCreate
@@ -51,6 +52,10 @@ def upsert_goal(session: Session, user_id: uuid.UUID, payload: GoalCreate) -> Go
     Re-setting targets for a date the user already configured is a correction,
     not a conflict — so this amends that version rather than rejecting it.
     """
+    logger.info(
+        "goals.upsert",
+        extra={"user_id": str(user_id), "goal": payload.model_dump(mode="json")},
+    )
     existing = session.scalar(
         _goal_query(user_id).where(Goal.effective_from == payload.effective_from)
     )
@@ -80,6 +85,7 @@ def update_goal(
 
 
 def delete_goal(session: Session, user_id: uuid.UUID, goal_id: uuid.UUID) -> None:
+    logger.info("goals.delete", extra={"user_id": str(user_id), "goal_id": str(goal_id)})
     goal = get_goal(session, user_id, goal_id)
     session.delete(goal)
     session.commit()

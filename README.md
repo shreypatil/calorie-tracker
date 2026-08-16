@@ -155,6 +155,18 @@ The prose fallback, used only when there is no table at all, is the one place th
 There every number it returns is checked to literally appear in the source text; one that doesn't is
 dropped and the row flagged. Those rows are never marked ready, so a human sees them all.
 
+**Naming a dish is enough.** Most meals are not packaged and have no label, so `POST /ai/estimate-nutrition`
+takes whatever the user has typed — a dish name, optionally a portion, optionally a figure or two they
+already know — and fills in only the fields they left alone. Anything they entered is sent as a fixed
+anchor and scaled around rather than replaced: state that a 350 g biryani was 300 kcal and the macros
+come back sized for 300 kcal, not for a generic serving.
+
+The guarantee that user input survives is structural rather than a frontend courtesy. The request
+names exactly which fields to estimate, and the service returns nothing outside that set — so a model
+volunteering extra values, or a future second caller, cannot overwrite something a person typed.
+Estimated fields are marked in the form and can be undone in one click, and the Save button remains
+the point at which anything is written.
+
 Nothing is written until the user confirms. `POST /imports/pdf` returns draft rows and a plain-language
 summary of what was understood; committing goes through the same `POST /entries/bulk` that manual
 entry uses, tagged as one undoable import batch.
@@ -218,7 +230,7 @@ attaches. No bytes reach disk or the database at any point.
 |---|---|
 | Errors | One `AppError` hierarchy → RFC 9457 `application/problem+json` via a single handler. No route builds an error body. |
 | Pagination | One `Page[T]` envelope and one `page`/`page_size` dependency on every list route; `page_size` capped at 100 server-side. |
-| Logging | Structured JSON with a request ID on every line, echoed in `X-Request-ID` and in every error body. |
+| Logging | Structured JSON to a rotating file plus readable text on the console, with a request ID on every line, echoed in `X-Request-ID` and in every error body. Secrets are redacted and oversized values truncated in the formatter, so no call site can leak. Every error response is logged by the exception handlers, and errors the app *handles* are logged at the point they are swallowed. `make logs` tails it. |
 | Auth | Argon2 hashing, 15-minute access tokens, rotating refresh tokens stored only as SHA-256 hashes. |
 | Timestamps | A `UtcDateTime` type keeps datetimes timezone-aware even on SQLite, which has no native timezone support. |
 
@@ -254,7 +266,7 @@ not a remark. There is no typing animation; the waiting state is a line of text.
 ## Testing
 
 ```bash
-make test    # 227 backend tests, plus the frontend type check and build
+make test    # 261 backend tests, plus the frontend type check and build
 make lint
 ```
 
@@ -387,6 +399,7 @@ DELETE /api/v1/goals/{id}         GET    /api/v1/reports/aggregate
 GET    /health                    GET    /api/v1/reports/daily-summary
                                   GET    /api/v1/reports/trend
 POST   /api/v1/ai/analyze-image   GET    /api/v1/reports/macros
+POST   /api/v1/ai/estimate-nutrition
 POST   /api/v1/imports/pdf        GET    /api/v1/reports/micros
 GET    /api/v1/imports            GET    /api/v1/reports/goal-vs-actual
 DELETE /api/v1/imports/{id}

@@ -10,7 +10,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from app.api.v1 import api_router
 from app.core.config import Settings, get_settings
 from app.core.errors import AppError, register_exception_handlers
-from app.core.logging import configure_logging, logger, set_request_id
+from app.core.logging import LogEvent, configure_logging, logger, set_request_id
 from app.services.rate_limit import limiter
 
 
@@ -22,7 +22,14 @@ class RateLimitedError(AppError):
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
-    configure_logging("DEBUG" if settings.debug else "INFO")
+    configure_logging(
+        "DEBUG" if settings.debug else settings.log_level,
+        to_file=settings.log_to_file,
+        log_dir=settings.log_dir,
+        filename=settings.log_filename,
+        max_bytes=settings.log_max_bytes,
+        backup_count=settings.log_backup_count,
+    )
 
     app = FastAPI(
         title=settings.app_name,
@@ -44,22 +51,48 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.middleware("http")
     async def request_context(request: Request, call_next) -> Response:
-        """Tag every request and its logs with a traceable ID."""
+        """Tag every request and its logs with a traceable ID, and bracket it with a log line.
+
+        The body is deliberately *not* read here. Draining `await request.body()` in middleware
+        consumes the receive stream, and the route then sees an empty body unless it is carefully
+        replayed. Bodies are logged instead at the service boundary, where they are already parsed
+        models — better structured, and it keeps multipart upload bytes out of the file entirely.
+        """
         request_id = set_request_id(request.headers.get("X-Request-ID"))
         started = time.perf_counter()
 
-        response = await call_next(request)
-
-        response.headers["X-Request-ID"] = request_id
         logger.info(
-            "request_completed",
+            "request_started",
             extra={
+                "event": LogEvent.REQUEST_STARTED,
                 "method": request.method,
                 "path": request.url.path,
-                "status_code": response.status_code,
-                "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+                "query": str(request.url.query) or None,
+                "client": request.client.host if request.client else None,
+                "content_type": request.headers.get("content-type"),
+                "content_length": request.headers.get("content-length"),
             },
         )
+
+        status_code = 500
+        try:
+            response = await call_next(request)
+            status_code = response.status_code
+        finally:
+            # In a `finally` so a request that dies inside the middleware stack — before any
+            # exception handler runs — still leaves a closing line rather than trailing off.
+            logger.info(
+                "request_completed",
+                extra={
+                    "event": LogEvent.REQUEST_COMPLETED,
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status_code": status_code,
+                    "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+                },
+            )
+
+        response.headers["X-Request-ID"] = request_id
         return response
 
     register_exception_handlers(app)

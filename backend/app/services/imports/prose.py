@@ -43,7 +43,10 @@ def _to_draft(index: int, raw: RawEntry, source: str, mapping: TableMapping) -> 
         if value is None:
             continue
         if not appears_in_source(float(value), source):
-            logger.warning("prose_value_not_in_source", extra={"field": field, "value": value})
+            logger.warning(
+                "prose_value_not_in_source",
+                extra={"field": field, "value": value, "row": index},
+            )
             label = field.replace("_", " ")
             issues.append(
                 RowIssue(

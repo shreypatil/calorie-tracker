@@ -17,6 +17,8 @@ import type {
   DateFormat,
   MealType,
   MicroSummary,
+  NutritionEstimate,
+  NutritionEstimateRequest,
   Page,
   PhotoDraft,
   PhotoKind,
@@ -360,5 +362,13 @@ export function useAggregate(request: AggregateRequest, enabled = true) {
       if (request.fill_gaps) search.set("fill_gaps", "true");
       return api.get<AggregateResponse>(`/reports/aggregate?${search}`);
     },
+  });
+}
+
+/** Estimate the nutrition of a described dish. Saves nothing; fills the form for review. */
+export function useEstimateNutrition() {
+  return useMutation({
+    mutationFn: (body: NutritionEstimateRequest) =>
+      api.post<NutritionEstimate>("/ai/estimate-nutrition", body),
   });
 }

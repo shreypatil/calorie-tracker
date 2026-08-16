@@ -5,6 +5,7 @@ exception type turns them into `application/problem+json`, so every error the
 API emits has the same shape and carries the request ID for correlation.
 """
 
+import logging
 from typing import Any
 
 from fastapi import FastAPI, Request, status
@@ -12,7 +13,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.core.logging import get_request_id, logger
+from app.core.logging import LogEvent, get_request_id, logger
 
 PROBLEM_CONTENT_TYPE = "application/problem+json"
 
@@ -106,9 +107,40 @@ def _problem(
     )
 
 
+def _log_failure(request: Request, *, status_code: int, **fields: Any) -> None:
+    """Record an error response.
+
+    Every error the API returns passes through one of these handlers, so logging here covers all of
+    them without a single route knowing about it. Client errors are expected outcomes and log at
+    WARNING; anything 5xx is a defect and logs at ERROR.
+
+    The limitation worth remembering: an error that is *caught and handled* never reaches a handler
+    and so is never logged here. Those call sites have to speak for themselves — see
+    `services/chat/agent.py`, where a swallowed validation failure once left no trace at all.
+    """
+    logger.log(
+        logging.WARNING if status_code < 500 else logging.ERROR,
+        "request_failed",
+        extra={
+            "event": LogEvent.REQUEST_FAILED,
+            "status_code": status_code,
+            "method": request.method,
+            "path": request.url.path,
+            **fields,
+        },
+    )
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
-    async def _handle_app_error(_: Request, exc: AppError) -> JSONResponse:
+    async def _handle_app_error(request: Request, exc: AppError) -> JSONResponse:
+        _log_failure(
+            request,
+            status_code=exc.status_code,
+            error_type=exc.error_type,
+            detail=exc.detail,
+            errors=exc.errors or None,
+        )
         return _problem(
             status_code=exc.status_code,
             title=exc.title,
@@ -118,7 +150,9 @@ def register_exception_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(RequestValidationError)
-    async def _handle_request_validation(_: Request, exc: RequestValidationError) -> JSONResponse:
+    async def _handle_request_validation(
+        request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
         errors = [
             {
                 "field": ".".join(str(part) for part in err["loc"][1:]) or str(err["loc"][0]),
@@ -127,6 +161,15 @@ def register_exception_handlers(app: FastAPI) -> None:
             }
             for err in exc.errors()
         ]
+        # The field list is the whole story for a 422; without it the log says only "validation
+        # failed", which is precisely as useful as the status code alone.
+        _log_failure(
+            request,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            error_type="/errors/validation-failed",
+            detail="The request body or parameters failed validation.",
+            errors=errors,
+        )
         return _problem(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             title="Validation Failed",
@@ -136,7 +179,8 @@ def register_exception_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(StarletteHTTPException)
-    async def _handle_http_exception(_: Request, exc: StarletteHTTPException) -> JSONResponse:
+    async def _handle_http_exception(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+        _log_failure(request, status_code=exc.status_code, detail=str(exc.detail))
         return _problem(
             status_code=exc.status_code,
             title=str(exc.detail),

@@ -47,7 +47,10 @@ def _verified_values(item: RawFoodItem, transcript: str, issues: list[RowIssue])
         if value is None:
             continue
         if not appears_in_source(float(value), transcript):
-            logger.warning("photo_value_not_in_transcript", extra={"field": field, "value": value})
+            logger.warning(
+                "photo_value_not_in_transcript",
+                extra={"field": field, "value": value, "food_name": item.food_name},
+            )
             issues.append(
                 RowIssue(
                     field=field,
