@@ -6,8 +6,8 @@
  * is a copy of a source of truth goes stale, and stale documentation is worse than none because it
  * is believed.
  *
- * The whole tree is behind `import.meta.env.DEV`, which Vite replaces with `false` at build time,
- * so a production build contains neither the routes nor this code.
+ * The whole tree is behind `DOCS_ENABLED` (see `lib/docs.ts`), which folds to a literal at build
+ * time, so a build without it contains neither the routes nor this code.
  */
 
 import { NavLink, Outlet } from "react-router-dom";
@@ -27,10 +27,7 @@ const PAGES = [
 export function DocsLayout() {
   return (
     <>
-      <PageHeading
-        title="Documentation"
-        description="Generated from the source of truth for each subject — not written alongside it."
-      />
+      <PageHeading title="Documentation" />
 
       <div className="mb-5 flex flex-wrap gap-1 border-b border-rule">
         {PAGES.map((page) => (

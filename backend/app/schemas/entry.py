@@ -1,11 +1,12 @@
 """Food entry request/response schemas."""
 
 import uuid
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.core.dates import is_future
 from app.db.models import EntrySource, MealType
 
 #: Nutritional amounts are never negative. Upper bounds are loose sanity checks
@@ -56,7 +57,7 @@ class EntryCreate(MicronutrientsMixin):
     @field_validator("consumed_on")
     @classmethod
     def _reject_future_dates(cls, value: date) -> date:
-        if value > datetime.now(UTC).date():
+        if is_future(value):
             raise ValueError("cannot be in the future")
         return value
 
@@ -88,7 +89,7 @@ class EntryUpdate(MicronutrientsMixin):
     @field_validator("consumed_on")
     @classmethod
     def _reject_future_dates(cls, value: date | None) -> date | None:
-        if value is not None and value > datetime.now(UTC).date():
+        if value is not None and is_future(value):
             raise ValueError("cannot be in the future")
         return value
 

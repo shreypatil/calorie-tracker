@@ -1,7 +1,7 @@
 /** Functional and non-functional requirements, parsed from `requirements.md`. */
 
+import { InlineMarkdown } from "../../components/InlineMarkdown";
 import { Card, CardHeader, Value } from "../../components/ui";
-import { cx } from "../../lib/cx";
 import requirements from "../../docs/generated/requirements.json";
 
 type Requirement = (typeof requirements.items)[number];
@@ -26,7 +26,9 @@ function Group({ title, subtitle, items }: { title: string; subtitle: string; it
               </td>
               <td className="px-5 py-3">
                 <p className="font-medium">{item.title}</p>
-                <p className="mt-1 text-ink-muted">{item.description}</p>
+                <p className="mt-1 text-ink-muted">
+                  <InlineMarkdown text={item.description} />
+                </p>
                 {item.criteria.length > 0 && (
                   <ul className="mt-2 space-y-1">
                     {item.criteria.map((criterion) => (
@@ -34,7 +36,9 @@ function Group({ title, subtitle, items }: { title: string; subtitle: string; it
                         <span aria-hidden className="text-accent">
                           ✓
                         </span>
-                        <span>{criterion}</span>
+                        <span>
+                          <InlineMarkdown text={criterion} />
+                        </span>
                       </li>
                     ))}
                   </ul>
@@ -57,12 +61,6 @@ export function Requirements() {
 
   return (
     <>
-      <p className={cx("mb-5 text-[13px] text-ink-muted")}>
-        Parsed from <span className="font-mono">requirements.md</span>. Every acceptance criterion
-        listed here is one the specification actually states — the table cannot drift from the spec
-        because it is derived from it.
-      </p>
-
       <Group
         title="Functional requirements"
         subtitle={`${functional.length} requirements, all implemented`}

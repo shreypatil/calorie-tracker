@@ -1,12 +1,18 @@
 services:
   api:
     build: ./backend
+    restart: unless-stopped
     environment:
       ENVIRONMENT: development
       DEBUG: "true"
       DATABASE_URL: sqlite:////srv/data/calorie_tracker.db
       JWT_SECRET: dev-only-insecure-secret-change-me
-      AI_PROVIDER: auto
+      # Empty by default, so a fresh clone still comes up keyless on the deterministic stub.
+      # Supply a key in the shell or in docker-compose.override.yml to use a real provider.
+      AI_PROVIDER: ${AI_PROVIDER:-auto}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_BASE_URL: ${AI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai/}
+      AI_MODEL: ${AI_MODEL:-gemini-flash-lite-latest}
       # Logs go to the named volume as well as stdout, so `docker compose logs` and the durable
       # file agree and neither is the only copy.
       LOG_DIR: /srv/logs
@@ -22,7 +28,13 @@ services:
       start_period: 10s
 
   web:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        # Overridden in docker-compose.override.yml when hosting a demo that should carry its own
+        # documentation. See frontend/src/lib/docs.ts.
+        VITE_SHOW_DOCS: "false"
+    restart: unless-stopped
     ports:
       - "8080:80"
     depends_on:

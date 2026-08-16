@@ -2,9 +2,9 @@
  * The docs route tree, in one lazily-imported module.
  *
  * Everything the documentation needs is reachable only from here, and this module is imported
- * exclusively behind `import.meta.env.DEV`. Vite replaces that with `false` in a production build,
- * Rollup then eliminates the branch, the `import()` call disappears with it, and the chunk is never
- * emitted — so none of this code ships. The build is checked for that rather than trusted.
+ * exclusively behind `DOCS_ENABLED`. That folds to a literal at build time, Rollup then eliminates
+ * the branch, the `import()` call disappears with it, and the chunk is never emitted — so none of
+ * this code ships. The build is checked for that rather than trusted.
  */
 
 import { Route } from "react-router-dom";

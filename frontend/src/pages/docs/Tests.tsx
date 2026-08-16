@@ -11,6 +11,7 @@
 
 import { Fragment, useState } from "react";
 
+import { InlineMarkdown } from "../../components/InlineMarkdown";
 import { Card, CardHeader, EmptyState, Value } from "../../components/ui";
 import { cx } from "../../lib/cx";
 import tests from "../../docs/generated/tests.json";
@@ -74,7 +75,9 @@ export function Tests() {
                   <td className="px-5 py-2.5 font-mono text-[12px] whitespace-nowrap">
                     {open === file.file ? "−" : "+"} {file.file.replace("backend/tests/", "")}
                   </td>
-                  <td className="py-2.5 pr-5 text-ink-muted">{file.purpose || "—"}</td>
+                  <td className="py-2.5 pr-5 text-ink-muted">
+                    {file.purpose ? <InlineMarkdown text={file.purpose} /> : "—"}
+                  </td>
                   <td className="px-5 py-2.5 text-right">
                     <Value>{file.collected}</Value>
                   </td>
@@ -89,7 +92,7 @@ export function Tests() {
                             <span className="font-mono text-[12px]">{testCase.name}</span>
                             {testCase.description && (
                               <span className="text-[12px] text-ink-muted">
-                                {testCase.description}
+                                <InlineMarkdown text={testCase.description} />
                               </span>
                             )}
                           </li>
@@ -115,7 +118,7 @@ export function Tests() {
       </Card>
 
       <Card className="mb-5">
-        <CardHeader title="Automated — frontend" subtitle="Run by `make test` and on demand" />
+        <CardHeader title="Automated — frontend" subtitle="Run by make test and on demand" />
         <table className="w-full text-[13px]">
           <tbody>
             {tests.frontend.map((item) => (
@@ -124,7 +127,9 @@ export function Tests() {
                 <td className="py-2.5 pr-3">
                   <KindTag kind={item.kind} />
                 </td>
-                <td className="py-2.5 pr-5 text-ink-muted">{item.description}</td>
+                <td className="py-2.5 pr-5 text-ink-muted">
+                  <InlineMarkdown text={item.description} />
+                </td>
               </tr>
             ))}
           </tbody>

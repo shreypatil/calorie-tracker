@@ -181,16 +181,29 @@ def goal_vs_actual(
     covers, so a weekly total is compared against a week's worth of target
     rather than against a single day's.
     """
+    metrics = ["calories", *MACRO_METRICS, *MICRO_METRICS]
     actuals = aggregate_over_time(
         session,
         user_id,
-        metrics=["calories", *MACRO_METRICS],
+        metrics=metrics,
         granularity=granularity,
         date_from=date_from,
         date_to=date_to,
     )
     goal_on = _goal_lookup(session, user_id)
-    targeted = ["calorie_target", *MACRO_METRICS]
+
+    def _target_for(goal, metric: str) -> float | None:
+        """Where a metric's target lives on a goal.
+
+        Calories are `calorie_target`, macros are columns of the same name, and micronutrients
+        live in the `micro_targets` JSON. Micros were omitted here originally, which meant a user
+        could set a fibre target on the Goals page and then find nothing to compare it against.
+        """
+        if metric == "calories":
+            return goal.calorie_target
+        if metric in MICRO_METRICS:
+            return (goal.micro_targets or {}).get(metric)
+        return getattr(goal, metric, None)
 
     results = []
     for row in actuals:
@@ -198,23 +211,20 @@ def goal_vs_actual(
         days = _days_in_bucket(bucket, granularity, date_from, date_to)
 
         targets: dict[str, float | None] = {}
-        for field in targeted:
+        for metric in metrics:
             values = [
-                getattr(goal, field)
+                target
                 for day in days
-                if (goal := goal_on(day)) and getattr(goal, field) is not None
+                if (goal := goal_on(day)) and (target := _target_for(goal, metric)) is not None
             ]
-            targets[field] = sum(values) if values else None
+            targets[metric] = sum(values) if values else None
 
         results.append(
             {
                 "bucket": bucket,
                 "days": len(days),
-                "actual": {"calories": row["calories"], **{m: row[m] for m in MACRO_METRICS}},
-                "target": {
-                    "calories": targets["calorie_target"],
-                    **{m: targets[m] for m in MACRO_METRICS},
-                },
+                "actual": {metric: row[metric] for metric in metrics},
+                "target": targets,
             }
         )
     return results

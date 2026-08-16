@@ -6,6 +6,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.core.dates import is_future
 from app.db.models import MICRONUTRIENT_FIELDS
 
 OptionalTarget = Annotated[float | None, Field(default=None, ge=0, le=1_000_000)]
@@ -80,7 +81,7 @@ class WeightLogCreate(BaseModel):
     @field_validator("logged_on")
     @classmethod
     def _reject_future_dates(cls, value: date) -> date:
-        if value > datetime.now().date():
+        if is_future(value):
             raise ValueError("cannot be in the future")
         return value
 

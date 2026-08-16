@@ -1,6 +1,6 @@
 """Food entry creation, validation, filtering and listing (FR-2, FR-3)."""
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from fastapi.testclient import TestClient
 
@@ -192,4 +192,49 @@ def test_bulk_create_without_filename_has_no_batch(client: TestClient, auth_head
 
 def test_bulk_create_rejects_empty_list(client: TestClient, auth_headers: dict) -> None:
     response = client.post("/api/v1/entries/bulk", json={"entries": []}, headers=auth_headers)
+    assert response.status_code == 422
+
+
+def test_today_is_loggable_from_a_timezone_ahead_of_utc(
+    client: TestClient, auth_headers: dict
+) -> None:
+    """A user's local "today" must never be rejected as a future date.
+
+    This failed in production. The validator compared against the UTC date while every date the app
+    *produces* — the browser's default, the photo routes, the chat tools — uses a local one. In
+    UTC+5:30, between midnight and 05:30, the two disagree by a day and logging breakfast returned a
+    422. Every assisted path broke the same way, because they all stamp entries with the local date.
+
+    Simulated by submitting tomorrow's UTC date, which is what a client in any forward timezone
+    sends during those hours.
+    """
+    ahead_of_utc = datetime.now(UTC).date() + timedelta(days=1)
+
+    response = client.post(
+        "/api/v1/entries",
+        json={
+            "consumed_on": ahead_of_utc.isoformat(),
+            "meal_type": "breakfast",
+            "food_name": "Porridge",
+            "calories": 250,
+        },
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 201, response.text
+
+
+def test_a_genuinely_future_date_is_still_rejected(client: TestClient, auth_headers: dict) -> None:
+    """The tolerance is exactly one day — enough for any timezone, not enough to log next week."""
+    response = client.post(
+        "/api/v1/entries",
+        json={
+            "consumed_on": (datetime.now(UTC).date() + timedelta(days=3)).isoformat(),
+            "meal_type": "breakfast",
+            "food_name": "Time travel",
+            "calories": 250,
+        },
+        headers=auth_headers,
+    )
+
     assert response.status_code == 422

@@ -36,13 +36,18 @@ function RedirectIfSignedIn({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Documentation, development only.
+ * Documentation — on in development, and in any build compiled with `VITE_SHOW_DOCS=true`.
  *
- * `import.meta.env.DEV` is replaced with a literal at build time, so in a production build this is
- * `false ? ... : null`. Rollup then drops the branch, the dynamic import goes with it, and the docs
- * chunk is never emitted — the code does not ship rather than merely being unreachable.
+ * `DOCS_ENABLED` folds to a literal at build time, so when it is false Rollup drops this branch,
+ * the dynamic import goes with it, and the docs chunk is never emitted — the code does not ship
+ * rather than merely being unreachable. The production bundle is grepped for docs strings in
+ * verification, because that is the only real evidence.
  */
-const DocsRoutes = import.meta.env.DEV
+// Inlined rather than imported from `lib/docs.ts` on purpose. Rollup folds an `import.meta.env`
+// literal in place, but would not fold the imported constant early enough to remove the `import()`
+// below — which left a 62 KB docs chunk on disk even with the flag off. Verified by grepping the
+// built bundle, not assumed.
+const DocsRoutes = import.meta.env.DEV || import.meta.env.VITE_SHOW_DOCS === "true"
   ? lazy(async () => {
       const module = await import("./pages/docs");
       return { default: () => <Routes>{module.docsRoutes()}</Routes> };

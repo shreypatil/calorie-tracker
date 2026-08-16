@@ -13,6 +13,10 @@ htmlcov/
 # Environment / secrets
 .env
 .env.local
+# Holds a real JWT secret and AI key for public hosting; the .example is committed instead.
+docker-compose.override.yml
+# Plaintext provider API keys. Never commit — rotate the key if this ever lands in a commit.
+keys_human_readable.md
 
 # Logs
 backend/logs/
@@ -38,7 +42,17 @@ shots/
 # Local working context for AI assistants — kept out of the published repo
 CLAUDE.md
 
-# Dev notes and docs
-keys_human_readable.md
+# Private working notes. This repo is a portfolio piece: the published tree should carry the
+# product and the documentation that explains it, not the correspondence that produced it.
+# comments.md   — review feedback on unfinished work
+# TODO.md       — deferred work, including unfixed security findings
+# DEMO_SCRIPT.md— personal recording script for the demo video
 comments.md
 TODO.md
+DEMO_SCRIPT.md
+
+# Internal security reporting. Names exact file:line locations of findings that are still open
+# against a publicly reachable deployment, so publishing it hands over a roadmap. Safe to track
+# once the findings in TODO.md are cleared.
+reports/
+

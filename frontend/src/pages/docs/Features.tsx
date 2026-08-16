@@ -7,6 +7,7 @@
  * deleted six months ago is the normal failure mode for documentation like this.
  */
 
+import { InlineMarkdown } from "../../components/InlineMarkdown";
 import { Card, CardHeader } from "../../components/ui";
 import features from "../../docs/generated/features.json";
 
@@ -33,14 +34,22 @@ export function Features() {
           <CardHeader title={feature.name} subtitle={feature.screen} />
 
           <div className="space-y-4 px-5 py-4">
-            <p className="text-[14px]">{feature.summary}</p>
+            <p className="text-[14px]">
+              <InlineMarkdown text={feature.summary} />
+            </p>
 
-            <Detail label="How to use">{feature.use}</Detail>
-            <Detail label="Internally">{feature.internal}</Detail>
+            <Detail label="How to use">
+              <InlineMarkdown text={feature.use} />
+            </Detail>
+            <Detail label="Internally">
+              <InlineMarkdown text={feature.internal} />
+            </Detail>
 
             {feature.safeguard && (
               <Detail label="Safeguard">
-                <span className="text-ink">{feature.safeguard}</span>
+                <span className="text-ink">
+                  <InlineMarkdown text={feature.safeguard} />
+                </span>
               </Detail>
             )}
 

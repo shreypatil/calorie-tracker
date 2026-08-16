@@ -4,6 +4,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { Button } from "./ui";
 import { cx } from "../lib/cx";
+import { DOCS_ENABLED } from "../lib/docs";
 
 const NAV = [
   { to: "/", label: "Today", end: true },
@@ -12,9 +13,9 @@ const NAV = [
   { to: "/goals", label: "Goals" },
   { to: "/import", label: "Import" },
   { to: "/chat", label: "Assistant" },
-  // Development only. The literal is replaced at build time, so the entry — and the docs bundle
-  // behind it — is absent from a production build entirely.
-  ...(import.meta.env.DEV ? [{ to: "/docs", label: "Docs" }] : []),
+  // Development, or a build compiled with VITE_SHOW_DOCS=true. The flag is a literal at build
+  // time, so when it is off this entry — and the docs bundle behind it — is absent entirely.
+  ...(DOCS_ENABLED ? [{ to: "/docs", label: "Docs" }] : []),
 ];
 
 export function Layout() {

@@ -8,6 +8,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 
+import { InlineMarkdown } from "../../components/InlineMarkdown";
 import { Alert, Card, CardHeader, Loading, Value } from "../../components/ui";
 import { cx } from "../../lib/cx";
 
@@ -104,10 +105,10 @@ export function Endpoints() {
                     </td>
                     <td className="py-2.5 pr-3 font-mono text-[12px] whitespace-nowrap">{path}</td>
                     <td className="py-2.5 pr-5">
-                      <p>{operation.summary ?? "—"}</p>
+                      <p>{operation.summary ? <InlineMarkdown text={operation.summary} /> : "—"}</p>
                       {operation.description && (
                         <p className="mt-1 text-[12px] whitespace-pre-line text-ink-muted">
-                          {operation.description.trim()}
+                          <InlineMarkdown text={operation.description.trim()} />
                         </p>
                       )}
                       {operation.parameters && operation.parameters.length > 0 && (

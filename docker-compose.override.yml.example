@@ -1,0 +1,41 @@
+# Public hosting overrides — copy to `docker-compose.override.yml` and fill in the secret.
+#
+#     cp docker-compose.override.yml.example docker-compose.override.yml
+#     openssl rand -hex 32          # paste the result as JWT_SECRET below
+#
+# Compose loads `docker-compose.override.yml` automatically and merges it over
+# `docker-compose.yml`, so the committed defaults stay untouched. The real file is gitignored
+# because it holds a live secret.
+
+services:
+  api:
+    environment:
+      # ENVIRONMENT stays `development` if you prefer — it changes exactly one thing in this
+      # codebase: `production` refuses to start when JWT_SECRET is still the committed default.
+      # In development that guard is off, so setting a real secret below is on you.
+      ENVIRONMENT: development
+
+      # REQUIRED. The value in docker-compose.yml is published in this repository, so anyone who
+      # reads it could forge a token for any account. Replace it before exposing anything.
+      JWT_SECRET: CHANGE-ME-run-openssl-rand-hex-32
+
+      # Public traffic at DEBUG writes every request payload to logs/app.log. Nothing is gained
+      # and a week of strangers' data accumulates on your disk.
+      DEBUG: "false"
+
+      # Name the provider explicitly rather than leaving it on `auto`: `auto` falls back to the
+      # offline stub when it finds no key, so a missing or misspelt key produces canned results
+      # instead of an error. On a deployment people will evaluate, that is the wrong failure mode.
+      AI_PROVIDER: openai_compatible
+      AI_API_KEY: CHANGE-ME-your-provider-key
+      AI_MODEL: gemini-flash-lite-latest
+
+      # Set AI_PROVIDER: stub instead if you would rather keep visitors off your quota. Every AI
+      # feature still demonstrates end to end — the stub is deterministic, not disabled.
+
+  web:
+    build:
+      args:
+        # Ships the Docs tab in the built bundle. Build-time only: Vite bakes it into the
+        # JavaScript, so `docker compose up --build` is required for a change here to take effect.
+        VITE_SHOW_DOCS: "true"

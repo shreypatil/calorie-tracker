@@ -1,6 +1,6 @@
 {
-  "total": 224,
-  "collected": 261,
+  "total": 226,
+  "collected": 263,
   "files": [
     {
       "file": "backend/tests/test_auth.py",
@@ -259,8 +259,8 @@
     {
       "file": "backend/tests/test_entries.py",
       "purpose": "Food entry creation, validation, filtering and listing (FR-2, FR-3).",
-      "count": 19,
-      "collected": 19,
+      "count": 21,
+      "collected": 21,
       "cases": [
         {
           "name": "test_create_entry",
@@ -356,6 +356,16 @@
           "name": "test_bulk_create_rejects_empty_list",
           "kind": "functional",
           "description": ""
+        },
+        {
+          "name": "test_today_is_loggable_from_a_timezone_ahead_of_utc",
+          "kind": "functional",
+          "description": "A user's local \"today\" must never be rejected as a future date."
+        },
+        {
+          "name": "test_a_genuinely_future_date_is_still_rejected",
+          "kind": "functional",
+          "description": "The tolerance is exactly one day — enough for any timezone, not enough to log next week."
         }
       ]
     },

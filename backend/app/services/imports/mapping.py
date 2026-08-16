@@ -6,10 +6,9 @@ user should be able to see and fix what went wrong, not wonder why 60 rows
 became 58.
 """
 
-from datetime import date
-
 from pydantic import ValidationError as PydanticValidationError
 
+from app.core.dates import is_future
 from app.db.models import MACRONUTRIENT_FIELDS, MICRONUTRIENT_FIELDS, EntrySource, MealType
 from app.schemas.entry import EntryCreate
 from app.schemas.import_ import (
@@ -175,7 +174,7 @@ def _to_entry(values: dict) -> tuple[EntryCreate | None, list[RowIssue]]:
 
     if entry.calories == 0:
         issues.append(RowIssue(field="calories", message="No calories recorded for this row."))
-    if entry.consumed_on > date.today():
+    if is_future(entry.consumed_on):
         # Almost always a misread date format rather than a real future meal.
         issues.append(
             RowIssue(

@@ -5,13 +5,12 @@ import { PageHeading } from "../components/Layout";
 import { Button, Card, ErrorNote, Field, Input, Loading, Select, Value } from "../components/ui";
 import { ChartFrame, Legend } from "../components/charts/chartTheme";
 import { CustomChart } from "../components/charts/CustomChart";
-import { TrendChart } from "../components/charts/TrendChart";
 import { MacroChart } from "../components/charts/MacroChart";
 import { GoalVsActualChart } from "../components/charts/GoalVsActualChart";
 import { MicroTable } from "../components/charts/MicroTable";
-import { useGoalVsActual, useMacros, useMicros, useTrend } from "../lib/queries";
-import { daysAgo, formatAmount, formatDate, today } from "../lib/format";
-import { MACROS, type Granularity } from "../lib/types";
+import { useCurrentGoal, useGoalVsActual, useMacros, useMicros } from "../lib/queries";
+import { daysAgo, formatAmount, formatDate, nutrientLabel, today } from "../lib/format";
+import { MACROS, MICRONUTRIENTS, type Granularity } from "../lib/types";
 
 /** Shortcuts, not the only way in — the dates themselves are directly editable. */
 const PRESETS = [
@@ -28,12 +27,27 @@ export function Reports() {
     granularity: "day" as Granularity,
   });
 
-  const trend = useTrend(range);
+  const [goalMetric, setGoalMetric] = useState("calories");
+
   const macros = useMacros(range);
   const micros = useMicros({ date_from: range.date_from, date_to: range.date_to });
   const comparison = useGoalVsActual(range);
+  const goal = useCurrentGoal();
 
   const bucketNote = `Grouped by ${range.granularity}.`;
+
+  /**
+   * Only nutrients the user has actually set a target for.
+   *
+   * Offering all fifteen would mostly produce charts with bars and no target line, which reads as
+   * a broken chart rather than as "you have not set that goal". Calories stay listed regardless so
+   * the control is never empty.
+   */
+  const targetedMetrics = [
+    "calories",
+    ...MACROS.filter((macro) => goal.data?.[macro] != null),
+    ...MICRONUTRIENTS.filter((micro) => goal.data?.micro_targets?.[micro] != null),
+  ];
 
   return (
     <>
@@ -106,16 +120,6 @@ export function Reports() {
 
       <div className="space-y-5">
         <CustomChart dateFrom={range.date_from} dateTo={range.date_to} />
-        <ChartFrame title="Calorie intake" description={`Energy logged over time. ${bucketNote}`}>
-          {trend.isLoading ? (
-            <Loading />
-          ) : trend.error ? (
-            <ErrorNote error={trend.error} />
-          ) : (
-            <TrendChart points={trend.data?.points ?? []} />
-          )}
-        </ChartFrame>
-
         <ChartFrame
           title="Macronutrients"
           description={`Grams of protein, carbs and fat. ${bucketNote}`}
@@ -146,11 +150,26 @@ export function Reports() {
 
         <ChartFrame
           title="Goal vs actual"
-          description={`Calories logged against the goal in force at the time. ${bucketNote}`}
+          description={`${nutrientLabel(goalMetric)} logged against the goal in force at the time. ${bucketNote}`}
+          controls={
+            <div className="w-44">
+              <Select
+                aria-label="Nutrient to compare"
+                value={goalMetric}
+                onChange={(event) => setGoalMetric(event.target.value)}
+              >
+                {targetedMetrics.map((metric) => (
+                  <option key={metric} value={metric}>
+                    {nutrientLabel(metric)}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          }
           legend={
             <Legend
               series={[
-                { key: "calories", label: "Logged" },
+                { key: goalMetric, label: `${nutrientLabel(goalMetric)} logged` },
                 { key: "target", label: "Target" },
               ]}
             />
@@ -161,7 +180,7 @@ export function Reports() {
           ) : comparison.error ? (
             <ErrorNote error={comparison.error} />
           ) : (
-            <GoalVsActualChart points={comparison.data?.points ?? []} />
+            <GoalVsActualChart points={comparison.data?.points ?? []} metric={goalMetric} />
           )}
         </ChartFrame>
 
