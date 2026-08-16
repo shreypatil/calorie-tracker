@@ -1,0 +1,1264 @@
+{
+  "total": 224,
+  "collected": 261,
+  "files": [
+    {
+      "file": "backend/tests/test_auth.py",
+      "purpose": "Authentication flows (FR-7).",
+      "count": 12,
+      "collected": 12,
+      "cases": [
+        {
+          "name": "test_register_returns_user_without_password",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_register_normalizes_email_case",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_duplicate_email_conflicts",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_short_password_rejected",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_login_with_wrong_password_fails",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_login_for_unknown_email_gives_same_error_as_wrong_password",
+          "kind": "functional",
+          "description": "The API must not reveal which email addresses are registered."
+        },
+        {
+          "name": "test_me_requires_authentication",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_me_rejects_garbage_token",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_me_returns_current_user",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_refresh_rotates_and_invalidates_the_old_token",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_logout_revokes_the_refresh_token",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_login_is_rate_limited",
+          "kind": "unit",
+          "description": ""
+        }
+      ]
+    },
+    {
+      "file": "backend/tests/test_chat.py",
+      "purpose": "Chat endpoint behaviour (FR-6).",
+      "count": 17,
+      "collected": 17,
+      "cases": [
+        {
+          "name": "test_proposing_a_write_changes_nothing",
+          "kind": "functional",
+          "description": "A write tool must never execute inside the agent loop."
+        },
+        {
+          "name": "test_confirming_writes_the_entries",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_confirming_twice_is_rejected",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_discarding_writes_nothing",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_confirm_accepts_corrected_arguments",
+          "kind": "functional",
+          "description": "The user fixing a number before committing is the point of the draft."
+        },
+        {
+          "name": "test_confirm_revalidates_corrected_arguments",
+          "kind": "functional",
+          "description": "Edited arguments go through the same model — a bad edit is a 422, not a 500."
+        },
+        {
+          "name": "test_unknown_action_is_not_found",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_read_tools_answer_without_proposing_anything",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_goal_can_be_read_and_set_through_chat",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_unrecognised_message_gets_a_helpful_reply",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_conversation_persists_and_paginates",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_clearing_removes_the_conversation",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_chat_requires_authentication",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_empty_message_is_rejected",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_users_cannot_see_each_others_conversations",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_users_cannot_confirm_each_others_actions",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_clearing_only_affects_the_calling_user",
+          "kind": "functional",
+          "description": ""
+        }
+      ]
+    },
+    {
+      "file": "backend/tests/test_chat_tools.py",
+      "purpose": "The tool layer: dispatch, argument validation, schema generation, and the loop's bounds.",
+      "count": 17,
+      "collected": 18,
+      "cases": [
+        {
+          "name": "test_every_tool_has_a_usable_spec",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_generated_schemas_are_flat_and_non_nullable",
+          "kind": "unit",
+          "description": "`$ref`, `$defs` and null unions all break at least one supported provider."
+        },
+        {
+          "name": "test_nested_models_are_inlined",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_no_tool_accepts_a_user_identifier",
+          "kind": "unit",
+          "description": "Identity is injected, never named."
+        },
+        {
+          "name": "test_unknown_tool_is_rejected_with_the_allowed_names",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_bad_arguments_are_rejected_before_a_service_runs",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_unknown_metric_never_reaches_the_query",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_log_meal_stamps_the_chat_source",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_query_entries_returns_ids_so_rows_can_be_edited",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_write_tools_are_declared",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_a_tool_cannot_read_another_users_entries",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_a_tool_cannot_mutate_another_users_entry",
+          "kind": "unit",
+          "description": "Even handed the exact ID, the owning user_id scopes it out of reach."
+        },
+        {
+          "name": "test_the_tool_loop_is_bounded",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_an_invented_tool_name_is_reported_back_not_raised",
+          "kind": "unit",
+          "description": "A wrong guess is the model's problem to fix, not a 500 for the user."
+        },
+        {
+          "name": "test_provider_extra_survives_a_round_trip",
+          "kind": "unit",
+          "description": "Gemini signs each tool call and rejects a replay that drops the signature."
+        },
+        {
+          "name": "test_a_call_without_provider_extra_stays_clean",
+          "kind": "unit",
+          "description": "Providers that send no extra data must not receive an empty key back."
+        },
+        {
+          "name": "test_unparsable_arguments_do_not_break_the_turn",
+          "kind": "unit",
+          "description": ""
+        }
+      ]
+    },
+    {
+      "file": "backend/tests/test_entries.py",
+      "purpose": "Food entry creation, validation, filtering and listing (FR-2, FR-3).",
+      "count": 19,
+      "collected": 19,
+      "cases": [
+        {
+          "name": "test_create_entry",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_create_entry_with_micronutrients",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_extra_micronutrients_go_to_overflow",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_future_dated_entry_is_rejected",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_negative_calories_rejected",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_zero_quantity_rejected",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_invalid_meal_type_rejected",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_blank_food_name_rejected",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_consumed_at_must_match_consumed_on",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_entries_require_authentication",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_filter_by_meal_type",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_filter_by_date_range_is_inclusive",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_reversed_date_range_is_rejected",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_search_by_food_name",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_update_entry_changes_only_supplied_fields",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_delete_entry",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_bulk_create_records_an_import_batch",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_bulk_create_without_filename_has_no_batch",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_bulk_create_rejects_empty_list",
+          "kind": "functional",
+          "description": ""
+        }
+      ]
+    },
+    {
+      "file": "backend/tests/test_error_handling.py",
+      "purpose": "Error envelope consistency (NFR-6).",
+      "count": 7,
+      "collected": 7,
+      "cases": [
+        {
+          "name": "test_health_endpoint",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_not_found_uses_the_problem_envelope",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_validation_error_lists_offending_fields",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_unauthorized_uses_the_problem_envelope",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_malformed_uuid_in_path_is_a_422_not_a_500",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_request_id_is_echoed_and_matches_the_body",
+          "kind": "functional",
+          "description": "A user-reported failure must be traceable to its logs."
+        },
+        {
+          "name": "test_supplied_request_id_is_preserved",
+          "kind": "functional",
+          "description": ""
+        }
+      ]
+    },
+    {
+      "file": "backend/tests/test_goals.py",
+      "purpose": "Goal versioning and weight logging (FR-1).",
+      "count": 13,
+      "collected": 13,
+      "cases": [
+        {
+          "name": "test_no_goal_yet_returns_404",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_create_and_fetch_current_goal",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_effective_from_defaults_to_today",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_setting_a_new_version_keeps_the_old_one",
+          "kind": "functional",
+          "description": "Changing targets must not rewrite what past days were measured against."
+        },
+        {
+          "name": "test_resetting_the_same_date_amends_that_version",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_micro_targets_accept_known_names",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_unknown_micro_target_is_rejected",
+          "kind": "functional",
+          "description": "A typo must fail loudly rather than be silently stored and never charted."
+        },
+        {
+          "name": "test_negative_target_rejected",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_update_and_delete_goal",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_record_weight",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_logging_weight_twice_in_a_day_corrects_it",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_future_weight_rejected",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_goals_require_authentication",
+          "kind": "functional",
+          "description": ""
+        }
+      ]
+    },
+    {
+      "file": "backend/tests/test_import_parsing.py",
+      "purpose": "Unit tests for reading values out of document cells.",
+      "count": 9,
+      "collected": 40,
+      "cases": [
+        {
+          "name": "test_parse_number_reads_messy_cells",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_parse_number_returns_none_for_blanks",
+          "kind": "unit",
+          "description": "None, not zero — a missing micronutrient is unknown, not absent."
+        },
+        {
+          "name": "test_parse_number_returns_none_for_unparseable_text",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_date_format_resolves_the_ambiguous_case",
+          "kind": "unit",
+          "description": "01/02/2026 is 1 Feb or 2 Jan depending only on the declared format."
+        },
+        {
+          "name": "test_parse_date",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_parse_date_returns_none_when_unreadable",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_parse_meal_type_handles_synonyms",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_parse_meal_type_returns_none_when_unrecognized",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_parse_text_collapses_whitespace_and_truncates",
+          "kind": "unit",
+          "description": ""
+        }
+      ]
+    },
+    {
+      "file": "backend/tests/test_imports.py",
+      "purpose": "PDF import: extraction, mapping application, preview, commit and undo (FR-8).",
+      "count": 30,
+      "collected": 30,
+      "cases": [
+        {
+          "name": "test_extracts_a_table_from_a_clean_pdf",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_falls_back_to_prose_when_there_is_no_table",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_scanned_pdf_is_rejected_with_an_explanation",
+          "kind": "unit",
+          "description": "No text layer means vision, which is Phase 3c — say so rather than returning zero rows with no reason."
+        },
+        {
+          "name": "test_non_pdf_content_is_rejected",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_oversized_upload_is_rejected",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_a_fully_mapped_row_is_ready_to_import",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_row_without_a_date_is_invalid_not_silently_dropped",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_unreadable_number_is_reported_against_its_field",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_missing_meal_type_is_defaulted_and_flagged",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_per_100g_values_are_scaled_to_the_serving",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_per_100g_without_a_serving_column_is_flagged_not_guessed",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_future_date_is_flagged_as_a_probable_format_error",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_low_confidence_column_puts_its_rows_up_for_review",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_blank_row_is_marked_invalid",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_a_number_absent_from_the_source_is_discarded",
+          "kind": "unit",
+          "description": "The one guarantee the prose path can offer: no invented figures."
+        },
+        {
+          "name": "test_a_number_present_in_the_source_is_kept",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_preview_returns_rows_without_saving_anything",
+          "kind": "functional",
+          "description": "The guarantee the whole feature rests on."
+        },
+        {
+          "name": "test_preview_reports_what_it_understood",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_date_format_override_changes_how_dates_are_read",
+          "kind": "functional",
+          "description": "The single most likely thing to be wrong, and one click to correct."
+        },
+        {
+          "name": "test_default_meal_type_override_is_applied",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_prose_diary_is_read_when_there_is_no_table",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_scanned_pdf_gets_a_clear_error",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_non_pdf_upload_is_rejected",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_import_requires_authentication",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_confirmed_rows_are_written_as_one_undoable_batch",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_undo_removes_the_entries_not_just_the_batch",
+          "kind": "functional",
+          "description": "source_ref is ON DELETE SET NULL, so deleting the batch alone would orphan the rows and leave the user's data changed."
+        },
+        {
+          "name": "test_reimporting_the_same_diary_flags_duplicates",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_a_user_cannot_see_or_undo_another_users_import",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_stub_infers_day_first_from_an_unambiguous_value",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_stub_rejects_nothing_it_cannot_recognize",
+          "kind": "unit",
+          "description": "Unmatched columns are left unmapped rather than guessed at."
+        }
+      ]
+    },
+    {
+      "file": "backend/tests/test_logging.py",
+      "purpose": "Logging behaviour (observability).",
+      "count": 16,
+      "collected": 21,
+      "cases": [
+        {
+          "name": "test_sensitive_keys_are_redacted",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_redaction_reaches_into_nested_structures",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_a_login_password_never_reaches_the_log",
+          "kind": "functional",
+          "description": "The whole reason redaction is enforced in the formatter rather than at call sites."
+        },
+        {
+          "name": "test_inline_image_data_is_not_written_out",
+          "kind": "unit",
+          "description": "One photo upload would otherwise put over a megabyte of base64 into the file."
+        },
+        {
+          "name": "test_long_values_are_truncated",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_long_sequences_are_clipped",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_scrubbing_survives_a_cycle",
+          "kind": "unit",
+          "description": "A logging call must never be the thing that takes the process down."
+        },
+        {
+          "name": "test_reserved_field_names_do_not_raise",
+          "kind": "unit",
+          "description": "`extra={\"message\": ...}` raises in stdlib logging; ours renames instead."
+        },
+        {
+          "name": "test_request_id_is_on_every_line",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_console_format_is_not_json",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_an_app_error_is_logged",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_a_validation_error_logs_its_field_errors",
+          "kind": "functional",
+          "description": "Without the field list a 422 log says only \"validation failed\", which helps nobody."
+        },
+        {
+          "name": "test_every_request_is_bracketed",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_a_swallowed_tool_failure_is_logged_with_its_arguments",
+          "kind": "unit",
+          "description": "The \"prawns curry\" case."
+        },
+        {
+          "name": "test_the_file_handler_writes_json_lines",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_the_log_directory_is_created",
+          "kind": "unit",
+          "description": "A fresh clone has no `logs/`, and a logger that raises on startup is worse than none."
+        }
+      ]
+    },
+    {
+      "file": "backend/tests/test_nutrition_estimate.py",
+      "purpose": "AI nutrition estimation for manually-typed meals.",
+      "count": 13,
+      "collected": 13,
+      "cases": [
+        {
+          "name": "test_a_field_the_caller_did_not_ask_for_is_dropped",
+          "kind": "unit",
+          "description": "A model volunteering extra fields must not be able to fill them in the user's form."
+        },
+        {
+          "name": "test_anchors_are_never_returned",
+          "kind": "unit",
+          "description": "The user typed 300 kcal."
+        },
+        {
+          "name": "test_anchors_reach_the_provider",
+          "kind": "unit",
+          "description": "They are excluded from the response but must still inform the estimate."
+        },
+        {
+          "name": "test_values_are_clamped",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_a_non_numeric_value_is_refused_at_the_schema_boundary",
+          "kind": "unit",
+          "description": "A model answering \"about 500\" must not reach the form as a number."
+        },
+        {
+          "name": "test_a_non_estimable_field_is_rejected",
+          "kind": "functional",
+          "description": "Names resolve through the allow-list, like every other registry in this codebase."
+        },
+        {
+          "name": "test_an_unknown_anchor_is_rejected",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_a_food_name_is_required",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_estimate_requires_authentication",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_the_stub_estimates_a_known_food",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_the_stub_scales_a_weight",
+          "kind": "functional",
+          "description": "Grams are a weight, not a count of servings — 200 g of rice, not 200 servings."
+        },
+        {
+          "name": "test_an_unknown_food_is_flagged_rather_than_invented",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_estimating_persists_nothing",
+          "kind": "functional",
+          "description": ""
+        }
+      ]
+    },
+    {
+      "file": "backend/tests/test_pagination.py",
+      "purpose": "Pagination behaviour, shared by every list endpoint (NFR-3).",
+      "count": 8,
+      "collected": 8,
+      "cases": [
+        {
+          "name": "test_default_page_size_applies",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_last_page_reports_no_next",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_page_beyond_the_end_is_empty_not_an_error",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_pages_do_not_overlap_or_skip",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_page_size_is_capped_server_side",
+          "kind": "functional",
+          "description": "No caller can ask for an unbounded result set."
+        },
+        {
+          "name": "test_invalid_pagination_params_rejected",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_total_reflects_filters_not_the_whole_table",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_goal_and_weight_lists_are_also_paginated",
+          "kind": "functional",
+          "description": ""
+        }
+      ]
+    },
+    {
+      "file": "backend/tests/test_photo.py",
+      "purpose": "Photo extraction (FR-5).",
+      "count": 28,
+      "collected": 28,
+      "cases": [
+        {
+          "name": "test_a_fabricated_number_is_dropped",
+          "kind": "unit",
+          "description": "A figure the model reported that is not on the label must not reach the entry."
+        },
+        {
+          "name": "test_a_transcribed_number_is_kept",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_thousands_separators_still_verify",
+          "kind": "unit",
+          "description": "`1,234` on the panel and `1234.0` in the JSON are the same number."
+        },
+        {
+          "name": "test_atwater_mismatch_is_flagged_but_kept",
+          "kind": "unit",
+          "description": "Fibre and sugar alcohols make honest deviation possible, so this warns, never deletes."
+        },
+        {
+          "name": "test_partial_macros_are_not_flagged",
+          "kind": "unit",
+          "description": "With fat and carbs missing, the implied total must fall short — flagging it is noise."
+        },
+        {
+          "name": "test_consistent_macros_are_not_flagged",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_meal_photos_skip_the_transcript_check",
+          "kind": "unit",
+          "description": "Nothing is written on a plate, so there is nothing to check against — only to label."
+        },
+        {
+          "name": "test_photo_rows_are_never_marked_ready",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_per_100g_scales_to_the_stated_serving",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_per_100g_without_a_serving_size_is_left_alone",
+          "kind": "unit",
+          "description": "Inventing a serving weight would silently rewrite every figure on the label."
+        },
+        {
+          "name": "test_low_confidence_is_surfaced",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_exif_rotation_is_applied",
+          "kind": "unit",
+          "description": "A phone stores a portrait photo sideways plus a tag."
+        },
+        {
+          "name": "test_large_images_are_downscaled",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_a_decompression_bomb_is_refused",
+          "kind": "unit",
+          "description": "Small on disk, enormous in memory — a byte-size limit alone does not catch this."
+        },
+        {
+          "name": "test_oversized_uploads_are_refused",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_non_images_are_refused",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_heic_gets_a_useful_message",
+          "kind": "unit",
+          "description": ""
+        },
+        {
+          "name": "test_metadata_does_not_survive",
+          "kind": "unit",
+          "description": "Re-encoding drops EXIF, including the GPS tags a phone attaches."
+        },
+        {
+          "name": "test_label_scan_returns_a_reviewable_draft",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_meal_scan_returns_one_row_per_food",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_analyzing_persists_nothing",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_a_non_image_upload_is_rejected",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_an_empty_upload_is_rejected",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_an_unknown_kind_is_rejected",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_analyze_requires_authentication",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_the_draft_commits_through_the_normal_entry_path",
+          "kind": "functional",
+          "description": "Extracted rows must travel the same validation path as anything typed by hand."
+        },
+        {
+          "name": "test_the_analyzed_image_is_never_stored",
+          "kind": "functional",
+          "description": "FR-5: the bytes are processed in memory and discarded."
+        },
+        {
+          "name": "test_stub_analysis_needs_no_credentials",
+          "kind": "unit",
+          "description": "`git clone && make dev` must exercise this with no key at all."
+        }
+      ]
+    },
+    {
+      "file": "backend/tests/test_reports.py",
+      "purpose": "Reporting layer (FR-4).",
+      "count": 28,
+      "collected": 28,
+      "cases": [
+        {
+          "name": "test_aggregate_totals_without_grouping",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_aggregate_group_by_meal_type",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_aggregate_group_by_day_returns_real_dates",
+          "kind": "functional",
+          "description": "Bucket keys must come back as dates, not backend-specific strings."
+        },
+        {
+          "name": "test_aggregate_group_by_week_starts_on_monday",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_aggregate_group_by_month",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_aggregate_multiple_dimensions",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_every_metric_and_dimension_in_the_catalogue_works",
+          "kind": "functional",
+          "description": "Guards the registries: anything advertised must actually be queryable."
+        },
+        {
+          "name": "test_unknown_metric_is_rejected",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_unknown_dimension_is_rejected",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_aggregate_requires_a_metric",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_reports_are_scoped_to_the_user",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_reports_require_authentication",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_trend_fills_empty_days_with_zero",
+          "kind": "functional",
+          "description": "Charts must not have holes where nothing was logged."
+        },
+        {
+          "name": "test_trend_by_week",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_daily_summary_totals_and_meal_breakdown",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_daily_summary_uses_the_goal_in_force_that_day",
+          "kind": "functional",
+          "description": "The 17th predates the goal change, so it must use the 2000 target."
+        },
+        {
+          "name": "test_daily_summary_without_a_goal",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_macro_breakdown_splits_by_energy_not_grams",
+          "kind": "functional",
+          "description": "A gram of fat carries more energy than a gram of protein."
+        },
+        {
+          "name": "test_macro_share_is_zero_when_nothing_logged",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_micro_summary_reports_totals_averages_and_targets",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_goal_vs_actual_compares_against_the_right_version",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_goal_vs_actual_sums_daily_targets_across_a_week",
+          "kind": "functional",
+          "description": "A weekly total must be compared against a week's worth of target."
+        },
+        {
+          "name": "test_goal_vs_actual_target_is_null_before_any_goal",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_reversed_date_range_is_rejected",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_default_range_is_the_last_four_weeks",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_aggregate_fill_gaps_emits_zero_buckets",
+          "kind": "functional",
+          "description": "A chart needs every bucket present; a line that skips a day misreports it."
+        },
+        {
+          "name": "test_aggregate_stays_sparse_by_default",
+          "kind": "functional",
+          "description": "The opt-in must really be opt-in — existing callers keep the sparse contract."
+        },
+        {
+          "name": "test_fill_gaps_is_ignored_for_non_date_grouping",
+          "kind": "functional",
+          "description": "There is no such thing as a missing meal type, so the flag must not change anything."
+        }
+      ]
+    },
+    {
+      "file": "backend/tests/test_user_isolation.py",
+      "purpose": "User isolation (FR-7, NFR-4).",
+      "count": 7,
+      "collected": 7,
+      "cases": [
+        {
+          "name": "test_entry_lists_are_separate",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_cannot_read_another_users_entry",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_cannot_update_another_users_entry",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_cannot_delete_another_users_entry",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_goals_are_separate",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_cannot_modify_another_users_goal",
+          "kind": "functional",
+          "description": ""
+        },
+        {
+          "name": "test_weight_logs_are_separate",
+          "kind": "functional",
+          "description": ""
+        }
+      ]
+    }
+  ],
+  "frontend": [
+    {
+      "file": "frontend/scripts/screenshots.mjs",
+      "kind": "browser",
+      "description": "Drives a real browser through every screen, exercises the photo scan, the nutrition estimate and a chat turn, and fails on any console error."
+    },
+    {
+      "file": "frontend/scripts/validate-palette.mjs",
+      "kind": "check",
+      "description": "Simulates protanopia, deuteranopia and tritanopia and fails if any chart series pair falls below the CIEDE2000 separation threshold."
+    },
+    {
+      "file": "frontend (tsc + oxlint + build)",
+      "kind": "check",
+      "description": "Type check, lint and production build, run by `make test`."
+    }
+  ],
+  "manual": [],
+  "manual_columns": [
+    "area",
+    "scenario",
+    "environment",
+    "expected",
+    "observed",
+    "date"
+  ]
+}

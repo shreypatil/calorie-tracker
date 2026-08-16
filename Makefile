@@ -1,4 +1,4 @@
-.PHONY: help install migrate migration seed dev api web test lint fmt reset logs docker-up docker-down
+.PHONY: help install migrate migration seed dev api web test lint fmt reset logs docs docs-check docker-up docker-down
 
 VENV := backend/.venv
 PY   := $(VENV)/bin/python
@@ -36,6 +36,12 @@ api: migrate ## Run only the API, with auto-reload
 
 web: ## Run only the web app (expects the API on port 8000)
 	cd frontend && npm run dev
+
+docs: ## Regenerate the in-app documentation from requirements, tests, manifests and the API
+	cd backend && LOG_TO_FILE=false .venv/bin/python -m scripts.generate_docs
+
+docs-check: ## Fail if the committed documentation is out of date
+	cd backend && LOG_TO_FILE=false .venv/bin/python -m scripts.generate_docs --check
 
 logs: ## Follow the JSON log file, pretty-printed if jq is available
 	@mkdir -p backend/logs

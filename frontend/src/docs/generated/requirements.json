@@ -1,0 +1,157 @@
+{
+  "items": [
+    {
+      "id": "FR-1",
+      "kind": "functional",
+      "title": "Goal setting",
+      "description": "Users can set and manage personal health goals: daily calorie target, protein/carb/fat targets, per-micronutrient targets, and a weight goal. Goals are **versioned by `effective_from` date** rather than mutated in place. The goal in force on any given date is the most recent version at or before that date.",
+      "criteria": [
+        "A user can create a goal version, list their goal history, and fetch the goal currently in force.",
+        "Editing targets creates or amends a version; it never silently rewrites what past days were measured against.",
+        "A report for a past date compares against the goal that was in force on that date, not today's goal.",
+        "All targets are optional individually; numeric targets must be non-negative.",
+        "Users can log their weight over time so the weight goal has an actual to compare against."
+      ]
+    },
+    {
+      "id": "FR-2",
+      "kind": "functional",
+      "title": "Meal entry",
+      "description": "Users can create food entries grouped by meal type (Breakfast, Lunch, Dinner, Snacks) with a food item name, quantity, and nutritional values (calories, macros, micros).",
+      "criteria": [
+        "An entry captures: meal type, food name, quantity and unit, calories, protein/carbs/fat, optional micronutrients,",
+        "Micronutrients from the fixed set are stored in typed fields; any additional micronutrient extracted by AI is kept in",
+        "All numeric fields are validated as non-negative; meal type must be one of the four allowed values.",
+        "An entry dated in the future is rejected.",
+        "An entry belongs to exactly one user and exactly one calendar date.",
+        "Entries can be read, updated, and deleted individually, and created in bulk."
+      ]
+    },
+    {
+      "id": "FR-3",
+      "kind": "functional",
+      "title": "Time-range listing",
+      "description": "Users can list their food entries within a specified time range, filterable by date and meal type.",
+      "criteria": [
+        "The list endpoint accepts `date_from`, `date_to`, `meal_type`, and a free-text food-name filter, in any combination.",
+        "Results are paginated (NFR-3) and returned in a stable, deterministic order.",
+        "A user only ever sees their own entries; requesting another user's entry returns 404, not 403, so the endpoint does"
+      ]
+    },
+    {
+      "id": "FR-4",
+      "kind": "functional",
+      "title": "Nutrition reports and graphs",
+      "description": "The app displays visual reports: weekly calorie intake trend, macronutrient breakdown by day/week, micronutrient summary, and goal-vs-actual comparison. Because reports are expected to grow beyond this initial set, they are built on a **single composable aggregation layer** (§5.3) rather than one hand-written query per chart.",
+      "criteria": [
+        "The four required visualizations render from real logged data.",
+        "Goal-vs-actual uses the goal version in force on each date (FR-1).",
+        "Days within a requested range that have no entries appear as zeros, so trend lines have no gaps.",
+        "A generic aggregation endpoint exposes metric × dimension combinations directly, so new reports need no backend change.",
+        "Only metric and dimension names from the server-side registries are accepted; anything else is rejected."
+      ]
+    },
+    {
+      "id": "FR-5",
+      "kind": "functional",
+      "title": "AI-powered calorie extraction",
+      "description": "Users can upload a photo of a product nutrition label or a plate of food; the app extracts nutritional information and pre-fills the entry form.",
+      "criteria": [
+        "The upload is analyzed and returns a **draft entry** — nothing is written to the database until the user confirms.",
+        "The draft populates food name, quantity, calories, macros, and any micronutrients the model identified.",
+        "The uploaded image is processed in memory and discarded; no image bytes are persisted anywhere.",
+        "Uploads are validated for content type and size before processing.",
+        "With no API key configured, the stub provider returns deterministic draft data so the flow is fully exercisable.",
+        "A provider failure surfaces a clear, actionable error rather than a stack trace or a silently empty form.",
+        "The user states whether the photo is a **label** or a **meal**, so each is prompted for and trusted differently.",
+        "**A label figure that does not appear in the model's own verbatim transcript of the panel is discarded and flagged**,",
+        "A meal photo yields one draft row per food, each independently editable, and is labelled as an estimate throughout.",
+        "Photo-derived rows are never marked ready; a person reviews every one before it is saved."
+      ]
+    },
+    {
+      "id": "FR-6",
+      "kind": "functional",
+      "title": "Conversational chat interface",
+      "description": "An LLM-powered chat interface lets users perform all app actions through natural language — logging meals, checking goals, asking nutritional questions, and getting weekly summaries — without touching traditional UI controls.",
+      "criteria": [
+        "The chat can log a meal, query entries, read and update goals, and produce a weekly summary, via tool calling.",
+        "Chat tools invoke **the same service functions** the REST endpoints use, so behaviour and validation cannot diverge",
+        "Each user has one persistent conversation that survives a page refresh, and can clear it.",
+        "Tools are scoped to the authenticated user; the chat cannot read or modify another user's data under any prompt.",
+        "**No tool that writes is executed by the conversation.** A change is returned as a proposed action and applied only",
+        "Read tools resolve within a bounded number of steps; the turn always ends with a reply rather than an error.",
+        "With no API key configured, the stub provider returns deterministic tool calls so the flow is fully exercisable."
+      ]
+    },
+    {
+      "id": "FR-7",
+      "kind": "functional",
+      "title": "Multi-user support",
+      "description": "Multiple independent users can sign up, log in, and maintain their own private data.",
+      "criteria": [
+        "Registration, login, token refresh, logout, and \"who am I\" are all supported.",
+        "Passwords are hashed with argon2 and never logged or returned.",
+        "Access tokens are short-lived; refresh tokens rotate on use, are stored only as hashes, and can be revoked.",
+        "Every data query is scoped by the authenticated user's ID **in the service layer**, not only at the route.",
+        "Test coverage asserts, per resource type, that user A cannot read or modify user B's data."
+      ]
+    },
+    {
+      "id": "FR-8",
+      "kind": "functional",
+      "title": "Bulk import via PDF",
+      "description": "Users can upload a food diary or nutrition history exported as a tabular PDF; entries are parsed and imported.",
+      "criteria": [
+        "The PDF is parsed and returns **draft rows** for review — nothing is written until the user confirms.",
+        "The review UI shows parsed rows, flags rows that failed validation, and lets the user correct or drop them.",
+        "Confirmed rows are written in one bulk operation, recorded as a single import batch so the whole import can be undone.",
+        "The PDF is processed in memory and discarded; no file bytes are persisted.",
+        "Uploads are validated for content type, size, and page count before processing.",
+        "A partially parseable PDF imports the rows it could read and reports the rows it could not, rather than failing whole."
+      ]
+    },
+    {
+      "id": "NFR-1",
+      "kind": "non-functional",
+      "title": "API/frontend separation",
+      "description": "The frontend contains no server-side data access. It communicates with the backend exclusively over HTTP APIs under `/api/v1`. The backend is independently runnable and its OpenAPI schema fully describes the contract.",
+      "criteria": []
+    },
+    {
+      "id": "NFR-2",
+      "kind": "non-functional",
+      "title": "Persistence",
+      "description": "All users, goals, food entries, weight logs, import batches, and chat messages are persisted in the database. Schema changes are applied through Alembic migrations, never ad-hoc DDL.",
+      "criteria": []
+    },
+    {
+      "id": "NFR-3",
+      "kind": "non-functional",
+      "title": "Pagination",
+      "description": "Every list endpoint is paginated using one shared envelope and the same `page` / `page_size` parameters. `page_size` is capped server-side. No endpoint can return an unbounded result set.",
+      "criteria": []
+    },
+    {
+      "id": "NFR-4",
+      "kind": "non-functional",
+      "title": "Security",
+      "description": "Argon2 password hashing; short-lived access tokens with rotating, revocable, hash-stored refresh tokens; user scoping enforced in the service layer; rate limiting on authentication and AI endpoints; upload content-type sniffing and size limits; a CORS allowlist from configuration; secrets supplied only via environment variables with a committed `.env.example` and a gitignored `.env`.",
+      "criteria": []
+    },
+    {
+      "id": "NFR-5",
+      "kind": "non-functional",
+      "title": "Clean, modular code",
+      "description": "Routers parse, authorize, and delegate; all business logic lives in the service layer; models and schemas are separate. Names describe intent. The AI provider, and the future external nutrition source, sit behind explicit interfaces so implementations can be swapped without touching callers.",
+      "criteria": []
+    },
+    {
+      "id": "NFR-6",
+      "kind": "non-functional",
+      "title": "Error handling and validation",
+      "description": "All input is validated by Pydantic schemas at the boundary. A single application error hierarchy is mapped to RFC 9457 `application/problem+json` responses by one exception handler, so no route hand-builds an error body. Every response and every log line carries a correlating request ID. External-service failures degrade to a clear message. --- ## 5. Data model ### 5.1 Entities **`users`** — `id` (UUID), `email` (unique, lowercased), `password_hash`, `display_name`, `created_at`, `updated_at` **`refresh_tokens`** — `id`, `user_id`, `token_hash`, `expires_at`, `revoked_at` Only hashes are…",
+      "criteria": []
+    }
+  ]
+}

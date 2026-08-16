@@ -35,6 +35,24 @@ Then open <http://localhost:5173> and sign in as `demo@example.com` / `demo-pass
 
 `make help` lists every target. `make api` and `make web` run the two halves separately.
 
+### In-app documentation
+
+Running in development adds a **Docs** tab covering the requirements, the API surface, the
+architecture, a feature-by-feature guide, and the test inventory. It is **not included in production
+builds** — `import.meta.env.DEV` is replaced at build time, so the routes and the whole docs bundle
+are eliminated rather than merely hidden.
+
+Every page is derived from the thing it documents, so none of it can drift: requirements from
+`requirements.md`, the test inventory from pytest, dependency versions from the manifests that
+install them, and the API surface fetched live from `/openapi.json`. The feature guide is authored in
+`docs/features.md` and then **verified** — `make docs` fails if it names an endpoint the API does not
+serve or a file that does not exist.
+
+```bash
+make docs         # regenerate
+make docs-check   # fail if the committed output is stale
+```
+
 ### No API keys required
 
 The app runs fully without any credentials. AI features sit behind a provider interface whose default

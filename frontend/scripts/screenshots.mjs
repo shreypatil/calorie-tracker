@@ -87,6 +87,25 @@ await scan("Estimate a meal", `${FIXTURES}/plate.jpg`);
 await page.waitForSelector("text=Add all", { timeout: 20000 });
 await page.screenshot({ path: `${OUT}/10-photo-plate.png`, fullPage: true });
 
+// Documentation (development only) — every subpage, so the console-error check covers them.
+for (const [name, path] of [
+  ["12-docs-requirements", "/docs/requirements"],
+  ["13-docs-api", "/docs/endpoints"],
+  ["14-docs-architecture", "/docs/architecture"],
+  ["15-docs-features", "/docs/features"],
+  ["16-docs-tests", "/docs/tests"],
+]) {
+  await page.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
+  await page.waitForTimeout(400);
+  // A blank page raises no console error, so "no errors" is not evidence a page rendered —
+  // it passed on an empty docs route once already. Assert there is actually content.
+  const text = (await page.locator("main").innerText()).trim();
+  if (text.length < 200) {
+    errors.push(`${path} rendered only ${text.length} characters — did the route match?`);
+  }
+  await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: true });
+}
+
 // A chat turn that proposes a write, so the draft card is covered too.
 await page.goto(`${BASE}/chat`, { waitUntil: "networkidle" });
 await page.fill("#chat-message", "log 2 eggs and toast for breakfast");

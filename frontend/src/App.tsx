@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { useAuth } from "./lib/auth";
@@ -34,6 +35,20 @@ function RedirectIfSignedIn({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * Documentation, development only.
+ *
+ * `import.meta.env.DEV` is replaced with a literal at build time, so in a production build this is
+ * `false ? ... : null`. Rollup then drops the branch, the dynamic import goes with it, and the docs
+ * chunk is never emitted — the code does not ship rather than merely being unreachable.
+ */
+const DocsRoutes = import.meta.env.DEV
+  ? lazy(async () => {
+      const module = await import("./pages/docs");
+      return { default: () => <Routes>{module.docsRoutes()}</Routes> };
+    })
+  : null;
+
 export default function App() {
   return (
     <Routes>
@@ -66,6 +81,16 @@ export default function App() {
         <Route path="/goals" element={<Goals />} />
         <Route path="/import" element={<Import />} />
         <Route path="/chat" element={<Chat />} />
+        {DocsRoutes && (
+          <Route
+            path="/docs/*"
+            element={
+              <Suspense fallback={null}>
+                <DocsRoutes />
+              </Suspense>
+            }
+          />
+        )}
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

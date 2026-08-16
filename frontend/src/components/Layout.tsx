@@ -12,6 +12,9 @@ const NAV = [
   { to: "/goals", label: "Goals" },
   { to: "/import", label: "Import" },
   { to: "/chat", label: "Assistant" },
+  // Development only. The literal is replaced at build time, so the entry — and the docs bundle
+  // behind it — is absent from a production build entirely.
+  ...(import.meta.env.DEV ? [{ to: "/docs", label: "Docs" }] : []),
 ];
 
 export function Layout() {

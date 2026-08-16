@@ -1,0 +1,213 @@
+{
+  "python": ">=3.12",
+  "backend_dependencies": [
+    {
+      "name": "fastapi",
+      "version": ">=0.115"
+    },
+    {
+      "name": "uvicorn[standard]",
+      "version": ">=0.32"
+    },
+    {
+      "name": "sqlalchemy",
+      "version": ">=2.0.36"
+    },
+    {
+      "name": "alembic",
+      "version": ">=1.14"
+    },
+    {
+      "name": "pydantic",
+      "version": ">=2.10"
+    },
+    {
+      "name": "pydantic-settings",
+      "version": ">=2.7"
+    },
+    {
+      "name": "pyjwt",
+      "version": ">=2.10"
+    },
+    {
+      "name": "argon2-cffi",
+      "version": ">=23.1"
+    },
+    {
+      "name": "python-multipart",
+      "version": ">=0.0.20"
+    },
+    {
+      "name": "slowapi",
+      "version": ">=0.1.9"
+    },
+    {
+      "name": "email-validator",
+      "version": ">=2.2"
+    },
+    {
+      "name": "pillow",
+      "version": ">=11.0"
+    },
+    {
+      "name": "pypdf",
+      "version": ">=5.1"
+    },
+    {
+      "name": "pdfplumber",
+      "version": ">=0.11"
+    },
+    {
+      "name": "openai",
+      "version": ">=1.57",
+      "extra": "ai"
+    },
+    {
+      "name": "pytest",
+      "version": ">=8.3",
+      "extra": "dev"
+    },
+    {
+      "name": "pytest-cov",
+      "version": ">=6.0",
+      "extra": "dev"
+    },
+    {
+      "name": "httpx",
+      "version": ">=0.28",
+      "extra": "dev"
+    },
+    {
+      "name": "ruff",
+      "version": ">=0.8",
+      "extra": "dev"
+    },
+    {
+      "name": "fpdf2",
+      "version": ">=2.8",
+      "extra": "dev"
+    }
+  ],
+  "frontend_dependencies": [
+    {
+      "name": "@fontsource-variable/ibm-plex-sans",
+      "version": "^5.3.0"
+    },
+    {
+      "name": "@fontsource/ibm-plex-mono",
+      "version": "^5.3.0"
+    },
+    {
+      "name": "@hookform/resolvers",
+      "version": "^5.8.0"
+    },
+    {
+      "name": "@tanstack/react-query",
+      "version": "^5.101.4"
+    },
+    {
+      "name": "react",
+      "version": "^19.2.8"
+    },
+    {
+      "name": "react-dom",
+      "version": "^19.2.8"
+    },
+    {
+      "name": "react-hook-form",
+      "version": "^7.85.0"
+    },
+    {
+      "name": "react-router-dom",
+      "version": "^7.18.2"
+    },
+    {
+      "name": "recharts",
+      "version": "^3.10.1"
+    },
+    {
+      "name": "zod",
+      "version": "^4.4.3"
+    }
+  ],
+  "layers": [
+    {
+      "path": "backend/app/core",
+      "purpose": "Config, security, dependencies, errors, pagination, logging."
+    },
+    {
+      "path": "backend/app/db",
+      "purpose": "Engine and session, declarative base, ORM models."
+    },
+    {
+      "path": "backend/app/schemas",
+      "purpose": "Pydantic request and response models — the validation boundary."
+    },
+    {
+      "path": "backend/app/services",
+      "purpose": "All business logic. Every function takes the owning user_id."
+    },
+    {
+      "path": "backend/app/services/reports",
+      "purpose": "The composable aggregation layer every report is built on."
+    },
+    {
+      "path": "backend/app/services/chat",
+      "purpose": "Tool registry, argument dispatch, the bounded agent loop."
+    },
+    {
+      "path": "backend/app/services/photo",
+      "purpose": "Image normalisation, vision extraction, verification."
+    },
+    {
+      "path": "backend/app/services/imports",
+      "purpose": "PDF extraction, mapping, preview, commit and undo."
+    },
+    {
+      "path": "backend/app/ai",
+      "purpose": "Provider Protocol, deterministic stub, one OpenAI-compatible adapter."
+    },
+    {
+      "path": "backend/app/api/v1/routers",
+      "purpose": "HTTP layer only — parse, authorize, delegate."
+    },
+    {
+      "path": "frontend/src/lib",
+      "purpose": "API client, session, query hooks, formatting."
+    },
+    {
+      "path": "frontend/src/components",
+      "purpose": "UI primitives and charts."
+    },
+    {
+      "path": "frontend/src/pages",
+      "purpose": "One file per screen."
+    }
+  ],
+  "invariants": [
+    {
+      "title": "Routers are thin; services hold the logic",
+      "detail": "Routes parse, authorize and delegate. This is what lets a chat tool call the same create_entry the REST API calls instead of growing a second implementation of the app."
+    },
+    {
+      "title": "Services always take the owning user_id",
+      "detail": "There is deliberately no get_entry(session, id). Isolation survives someone adding a route without thinking about it. Another user's record returns 404, not 403."
+    },
+    {
+      "title": "Goals are versioned, never mutated across time",
+      "detail": "The goal in force on a date is the latest version at or before it. Without this, changing a target silently rewrites what every past day was measured against."
+    },
+    {
+      "title": "food_entries is a fact table; aggregation never touches JSON",
+      "detail": "Anything that might be aggregated gets a typed column. micros_extra is display-only."
+    },
+    {
+      "title": "A new report is a new caller, not new SQL",
+      "detail": "METRICS and DIMENSIONS registries plus one aggregate(). Names resolve through the registries, so user input never reaches the query text — that is the injection defence."
+    },
+    {
+      "title": "All dialect-specific SQL lives in one helper",
+      "detail": "Exactly one construct differs between SQLite and PostgreSQL, which is what keeps the Postgres move a configuration change."
+    }
+  ]
+}
